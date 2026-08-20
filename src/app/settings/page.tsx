@@ -1,0 +1,51 @@
+"use client";
+
+import { AppShell } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui";
+import { games } from "@/data/games";
+import { useApp } from "@/lib/store";
+import { useRouter } from "next/navigation";
+
+export default function SettingsPage() {
+  const { currentUser, selectedGames, skillLevel, logout } = useApp();
+  const router = useRouter();
+
+  return (
+    <AppShell>
+      <div className="px-6 py-8 max-w-xl">
+        <h1 className="text-3xl font-bold">Settings</h1>
+        <section className="mt-8 rounded-2xl border border-border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Account</h2>
+          <div className="text-sm text-muted">
+            Signed in as {currentUser.displayName} (@{currentUser.username})
+          </div>
+          <div className="text-sm text-muted">Skill preference: {skillLevel ?? "—"}</div>
+          <div className="text-sm text-muted">
+            Games:{" "}
+            {games
+              .filter((g) => selectedGames.includes(g.id))
+              .map((g) => g.name)
+              .join(", ") || "None"}
+          </div>
+        </section>
+        <section className="mt-4 rounded-2xl border border-border bg-card p-5">
+          <h2 className="font-semibold">Learning</h2>
+          <p className="text-sm text-muted mt-2">
+            EZTips is built to convert a useful clip into a path — not to keep you scrolling. Daily
+            goal defaults to 3 tutorials.
+          </p>
+        </section>
+        <Button
+          variant="danger"
+          className="mt-6"
+          onClick={() => {
+            logout();
+            router.push("/");
+          }}
+        >
+          Sign out & reset onboarding
+        </Button>
+      </div>
+    </AppShell>
+  );
+}
