@@ -13,7 +13,7 @@ export function Logo({
       <img
         src={compact ? "/eztips-mark.svg" : "/eztips-logo.svg"}
         alt="EZTips"
-        className={compact ? "h-8 w-8" : "h-8 w-[120px]"}
+        className={compact ? "h-8 w-8" : "h-8 w-auto"}
       />
     </span>
   );

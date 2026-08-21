@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" role="img" aria-labelledby="title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 160" role="img" aria-labelledby="title">
   <title id="title">EZTips</title>
   <g>
     <path d="M31 9C19 2 8 11 8 25v110c0 14 11 23 23 16l108-60c13-7 13-25 0-32L31 9Z" fill="#7657FF"/>
@@ -7,13 +7,11 @@
     <path d="m121 14 5 13 13 5-13 5-5 13-5-13-13-5 13-5 5-13Z" fill="#20E3E3"/>
     <path d="m126 71 17 10-17 10V71Z" fill="#20E3E3"/>
   </g>
-  <g fill="#F4F6FA">
-    <path d="M177 43h64v16h-44v16h39v15h-39v17h45v16h-65V43Z"/>
-    <path d="M251 43h66v15l-43 49h44v16h-69v-15l43-49h-41V43Z"/>
+  <g fill="#F4F6FA" transform="translate(-148)">
     <path d="M325 43h72v17h-26v63h-20V60h-26V43Z"/>
     <path d="M408 67h19v56h-19V67Z"/>
     <path fill-rule="evenodd" d="M440 66h18v7c5-6 12-9 21-9 18 0 31 13 31 30 0 18-13 31-31 31-9 0-16-3-21-9v28h-18V66Zm18 28c0 9 7 15 17 15s17-6 17-15c0-8-7-14-17-14s-17 6-17 14Z"/>
     <path d="M565 80c-7-3-15-5-22-5-7 0-11 2-11 6 0 3 4 4 15 6 17 3 24 9 24 19 0 12-11 20-29 20-12 0-23-3-31-8l8-13c7 5 16 7 24 7 8 0 12-2 12-6 0-3-4-5-15-7-17-3-24-8-24-19 0-12 11-20 28-20 11 0 21 2 28 6l-7 14Z"/>
   </g>
-  <circle cx="417.5" cy="52" r="10" fill="#20E3E3"/>
+  <circle cx="269.5" cy="52" r="10" fill="#20E3E3"/>
 </svg>
