@@ -10,7 +10,6 @@ import {
   Compass,
   Gamepad2,
   Home,
-  PlusSquare,
   Settings,
   UserRound,
 } from "lucide-react";
@@ -20,13 +19,12 @@ import { Logo } from "../Logo";
 import { Avatar } from "../ui";
 import { GameLogo } from "../GameLogo";
 
-const nav = (loggedIn: boolean) => [
+const nav = (loggedIn: boolean, username: string) => [
   { href: loggedIn ? "/home" : "/", label: "Home", icon: Home },
   { href: "/explore", label: "Explore", icon: Compass },
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/upload", label: "Upload", icon: PlusSquare },
   { href: "/library", label: "Saved", icon: Bookmark },
-  { href: "/u/playerone", label: "Profile", icon: UserRound },
+  { href: `/u/${username}`, label: "Profile", icon: UserRound },
 ];
 
 export function Sidebar({
@@ -52,7 +50,7 @@ export function Sidebar({
         <Logo compact={collapsed} />
       </Link>
       <nav className="flex flex-col gap-0.5">
-        {nav(isLoggedIn).map((item) => {
+        {nav(isLoggedIn, currentUser.username).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
@@ -143,7 +141,6 @@ export function MobileNav() {
     { href: "/home", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
     { href: "/games", label: "Games", icon: Gamepad2 },
-    { href: "/upload", label: "Upload", icon: PlusSquare },
     { href: "/library", label: "Saved", icon: Bookmark },
     { href: `/u/${currentUser.username}`, label: "Profile", icon: UserRound },
   ];

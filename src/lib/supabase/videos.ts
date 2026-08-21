@@ -10,6 +10,7 @@ export async function fetchCommunityVideos() {
     .from("videos")
     .select(videoSelect)
     .eq("status", "published")
+    .eq("visibility", "public")
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) throw error;

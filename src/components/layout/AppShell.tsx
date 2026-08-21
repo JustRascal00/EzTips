@@ -10,8 +10,6 @@ import { ToastHost } from "../ToastHost";
 import { Skeleton } from "../ui";
 import { MobileNav, Sidebar } from "./Sidebar";
 import { NotificationPanel } from "./Notifications";
-import Link from "next/link";
-import { Plus } from "lucide-react";
 
 export function AppShell({
   children,
@@ -63,22 +61,6 @@ export function AppShell({
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="hidden md:flex h-16 items-center gap-4 px-6 border-b border-border bg-bg/80 backdrop-blur sticky top-0 z-30">
           <SearchBar className="max-w-xl flex-1" />
-          {isLoggedIn ? (
-            <Link
-              href="/upload"
-              className="ml-auto inline-flex items-center gap-2 h-10 px-3 rounded-xl bg-card border border-border text-sm hover:bg-hover transition-colors duration-200"
-            >
-              <Plus className="h-4 w-4" />
-              Upload
-            </Link>
-          ) : (
-            <Link
-              href={configured ? "/auth?mode=signup" : "/onboarding"}
-              className="ml-auto inline-flex items-center h-10 px-4 rounded-xl bg-accent text-sm font-medium hover:bg-accent-hover"
-            >
-              Build my feed
-            </Link>
-          )}
         </header>
         <div className="flex flex-1 min-h-0">
           <main

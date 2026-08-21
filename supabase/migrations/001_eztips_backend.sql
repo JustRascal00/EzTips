@@ -69,8 +69,11 @@ create table if not exists public.videos (
   video_url text not null,
   thumbnail_url text,
   status text not null default 'published' check (status in ('draft', 'published', 'hidden')),
+  visibility text not null default 'public' check (visibility in ('public', 'unlisted', 'private')),
+  learning_metadata jsonb not null default '{}'::jsonb,
   views bigint not null default 0 check (views >= 0),
   likes_count bigint not null default 0 check (likes_count >= 0),
+  saves_count bigint not null default 0 check (saves_count >= 0),
   comments_count bigint not null default 0 check (comments_count >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -79,6 +82,7 @@ create table if not exists public.videos (
 create index if not exists videos_user_id_idx on public.videos(user_id);
 create index if not exists videos_game_created_idx on public.videos(game_id, created_at desc);
 create index if not exists videos_status_created_idx on public.videos(status, created_at desc);
+create index if not exists videos_visibility_created_idx on public.videos(visibility, created_at desc);
 create index if not exists user_games_user_id_idx on public.user_games(user_id);
 
 create table if not exists public.video_likes (

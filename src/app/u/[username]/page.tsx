@@ -8,6 +8,8 @@ import { games } from "@/data/games";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/cn";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import { Clapperboard, Settings2 } from "lucide-react";
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
@@ -28,6 +30,16 @@ export default function UserProfilePage() {
               {user.ranks.map((r) => (
                 <RankBadge key={r.gameId} label={`${games.find((g) => g.id === r.gameId)?.short} · ${r.label}`} type="rank" />
               ))}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link href="/studio" className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent-hover">
+                <Clapperboard className="h-4 w-4" />
+                Creator Studio
+              </Link>
+              <Link href="/settings" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-muted transition hover:bg-hover hover:text-white">
+                <Settings2 className="h-4 w-4" />
+                Edit profile
+              </Link>
             </div>
           </div>
         </div>
