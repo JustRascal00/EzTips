@@ -1,38 +1,64 @@
 "use client";
 
+import { Button, VerifiedMark } from "@/components/ui";
+import { GameCard, TutorialCard } from "@/components/cards";
 import { Logo } from "@/components/Logo";
-import { GameCard, PathCard, TutorialCard } from "@/components/cards";
-import { Button, RankBadge, VerifiedMark } from "@/components/ui";
 import { creators } from "@/data/creators";
 import { games } from "@/data/games";
-import { learningPaths } from "@/data/paths";
 import { tutorials } from "@/data/tutorials";
+import { formatCount } from "@/lib/format";
 import { useApp } from "@/lib/store";
+import { Bookmark, Heart, MessageCircle, Play, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 function FeedPreview() {
-  const t = tutorials[0];
+  const clip = tutorials[0];
+  const creator = creators.find((item) => item.id === clip.creatorId);
   return (
-    <div className="relative w-full max-w-[420px] mx-auto">
-      <div className="absolute -inset-4 rounded-[28px] border border-border bg-elevated" />
-      <div className="relative overflow-hidden rounded-2xl border border-border aspect-[9/16] max-h-[560px]">
+    <div className="relative mx-auto w-full max-w-[420px]">
+      <div className="absolute -inset-8 rounded-full bg-accent/15 blur-3xl" />
+      <div className="relative mx-auto aspect-[9/16] max-h-[620px] overflow-hidden rounded-[28px] border border-white/10 bg-black shadow-2xl shadow-black/60">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={t.thumbnail} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-        <div className="absolute top-4 left-4 right-4">
-          <div className="text-[11px] font-medium text-white/75">
-            League of Legends · Mid Lane · Intermediate
-          </div>
-          <div className="font-bold text-xl mt-1 leading-tight">{t.title}</div>
+        <img src={clip.thumbnail} alt="Gameplay clip preview" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/25" />
+        <div className="absolute left-4 top-4 rounded-full border border-white/15 bg-black/45 px-3 py-1.5 text-xs font-semibold backdrop-blur">
+          League of Legends
         </div>
-        <div className="absolute bottom-4 left-4 right-4 space-y-2">
-          <div className="rounded-xl border border-white/10 bg-black/50 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-white/60">You&apos;ll learn</div>
-            <p className="text-sm mt-1">{t.learn}</p>
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="grid h-16 w-16 place-items-center rounded-full border border-white/20 bg-black/40 backdrop-blur">
+            <Play className="ml-1 h-7 w-7 fill-white" />
+          </span>
+        </div>
+        <div className="absolute bottom-5 left-4 right-16">
+          <div className="mb-3 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={creator?.avatar} alt="" className="h-9 w-9 rounded-full border border-white/25" />
+            <div>
+              <div className="text-sm font-bold">@{creator?.username}</div>
+              <div className="text-[11px] text-white/60">Community creator</div>
+            </div>
+            <span className="rounded-lg bg-accent px-2.5 py-1 text-xs font-bold">Follow</span>
           </div>
-          <div className="text-sm font-medium text-[#43D17A]">94% found this helpful</div>
+          <h2 className="text-xl font-bold leading-tight">{clip.title}</h2>
+          <p className="mt-2 text-xs font-semibold">#MidLane #Macro #Intermediate</p>
+          <p className="mt-2 text-[11px] text-white/55">{formatCount(clip.views)} views</p>
+        </div>
+        <div className="absolute bottom-5 right-3 flex flex-col gap-4">
+          {([
+            { Icon: Heart, label: formatCount(clip.likes) },
+            { Icon: MessageCircle, label: formatCount(clip.comments) },
+            { Icon: Bookmark, label: "Save" },
+            { Icon: Share2, label: "Share" },
+          ] as const).map(({ Icon, label }, index) => (
+            <span key={index} className="flex flex-col items-center gap-1 text-[10px] font-semibold">
+              <span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-black/45 backdrop-blur">
+                <Icon className="h-4 w-4" />
+              </span>
+              {label}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -45,162 +71,112 @@ export default function MarketingPage() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (hydrated) {
-      if (isLoggedIn) router.replace("/home");
-      else setReady(true);
-    }
+    if (!hydrated) return;
+    if (isLoggedIn) router.replace("/home");
+    else setReady(true);
   }, [hydrated, isLoggedIn, router]);
 
   if (!ready) return <div className="min-h-screen bg-bg" />;
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+    <div className="min-h-screen overflow-hidden bg-bg">
+      <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Logo />
-          <nav className="hidden md:flex items-center gap-6 text-sm text-muted">
-            <a href="#games" className="hover:text-text">
-              Games
-            </a>
-            <a href="#creators" className="hover:text-text">
-              Creators
-            </a>
-            <a href="#paths" className="hover:text-text">
-              Paths
-            </a>
-            <a href="#trending" className="hover:text-text">
-              Explore
-            </a>
+          <nav className="hidden items-center gap-6 text-sm text-muted md:flex">
+            <a href="#games" className="hover:text-text">Games</a>
+            <a href="#creators" className="hover:text-text">Creators</a>
+            <a href="#how-it-works" className="hover:text-text">How it works</a>
+            <a href="#trending" className="hover:text-text">Explore</a>
           </nav>
-          <div className="flex items-center gap-2">
-            <Link href="/onboarding">
-              <Button>Start Learning</Button>
-            </Link>
-          </div>
+          <Link href="/onboarding"><Button>Build my feed</Button></Link>
         </div>
       </header>
 
-      <section className="max-w-6xl mx-auto px-5 py-16 md:py-24 grid md:grid-cols-2 gap-12 items-center">
-        <div>
-          <p className="text-sm text-muted font-medium">Short-form coaching for ranked players</p>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mt-3 leading-[1.1]">
-            Get better at the games you play.
-          </h1>
-          <p className="text-muted text-lg mt-4 max-w-md leading-relaxed">
-            Short tutorials from skilled players. Find the exact tip you need, learn new mechanics,
-            and improve one minute at a time.
-          </p>
-          <div className="flex flex-wrap gap-3 mt-8">
-            <Link href="/onboarding">
-              <Button size="lg">Start Learning</Button>
-            </Link>
-            <Link href="#trending">
-              <Button size="lg" variant="secondary">
-                Explore Tutorials
-              </Button>
-            </Link>
-          </div>
-          <div className="flex gap-8 mt-10 text-sm">
-            <div>
-              <div className="text-xl font-semibold">8 games</div>
-              <div className="text-muted">Dedicated hubs</div>
+      <main>
+        <section className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 py-16 md:grid-cols-2 md:py-24">
+          <div className="pointer-events-none absolute -left-80 top-10 h-[480px] w-[480px] rounded-full bg-accent/10 blur-[120px]" />
+          <div className="relative">
+            <p className="text-sm font-semibold text-accent">Community clips. Personalized to your games.</p>
+            <h1 className="mt-4 text-4xl font-bold leading-[1.06] tracking-tight md:text-6xl">
+              Learn your favorite games, one clip at a time.
+            </h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">
+              Choose the games you play and scroll a feed of tips, mechanics, strategies, and guides uploaded by real players.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/onboarding"><Button size="lg">Choose my games</Button></Link>
+              <a href="#trending"><Button size="lg" variant="secondary">Watch community clips</Button></a>
             </div>
-            <div>
-              <div className="text-xl font-semibold">30–70s</div>
-              <div className="text-muted">Typical tutorial</div>
-            </div>
-            <div>
-              <div className="text-xl font-semibold">Helpful</div>
-              <div className="text-muted">Not just likes</div>
+            <div className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-border pt-6 text-sm">
+              <div><div className="text-xl font-bold">22K+</div><div className="text-muted">Creators</div></div>
+              <div><div className="text-xl font-bold">20–60s</div><div className="text-muted">Useful clips</div></div>
+              <div><div className="text-xl font-bold">Your games</div><div className="text-muted">Your feed</div></div>
             </div>
           </div>
-        </div>
-        <FeedPreview />
-      </section>
+          <FeedPreview />
+        </section>
 
-      <section id="games" className="max-w-6xl mx-auto px-5 py-16">
-        <h2 className="text-2xl font-bold">Pick your game</h2>
-        <p className="text-muted mt-1">Every title gets its own hub — roles, characters, paths.</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-          {games.map((g) => (
-            <GameCard key={g.id} game={g} href="/onboarding" />
-          ))}
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto px-5 py-16 grid md:grid-cols-2 gap-10 items-center">
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted">A minute, not a course</div>
-          <h3 className="text-xl font-bold mt-2">Stop making this roaming mistake</h3>
-          <p className="text-sm text-muted mt-2">League of Legends · Mid Lane · Intermediate · 54s</p>
-          <div className="mt-4 rounded-xl border border-border bg-elevated p-4 text-sm">
-            You&apos;ll learn: how to recognize when leaving your lane actually gives the opponent an
-            advantage.
+        <section id="games" className="mx-auto max-w-6xl px-5 py-16">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-accent">Personalized discovery</p>
+          <h2 className="mt-3 text-3xl font-bold">Pick the games you actually play</h2>
+          <p className="mt-2 text-muted">Choose one or several. Your For You feed stays focused on those games.</p>
+          <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {games.map((game) => <GameCard key={game.id} game={game} href="/onboarding" />)}
           </div>
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold">Learn in minutes, not hours</h2>
-          <p className="text-muted mt-3 leading-relaxed">
-            Each tutorial is one decision, one mechanic, one mistake. Watch it between queues. Save
-            it. Then follow a path when you want the full picture — not a two-hour VOD dump.
-          </p>
-        </div>
-      </section>
+        </section>
 
-      <section id="creators" className="max-w-6xl mx-auto px-5 py-16">
-        <h2 className="text-2xl font-bold">Learn from players who know the game</h2>
-        <p className="text-muted mt-1">Ranks and coaching credentials, not vanity badges.</p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
-          {creators.slice(0, 6).map((c) => (
-            <div key={c.id} className="rounded-2xl border border-border bg-card p-4 flex gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.avatar} alt="" className="h-12 w-12 rounded-full border border-border" />
-              <div>
-                <div className="flex items-center gap-1 font-semibold">
-                  {c.displayName}
-                  {c.verified && <VerifiedMark />}
-                </div>
-                <div className="mt-1">
-                  <RankBadge label={c.credential.label} type={c.credential.type} />
-                </div>
-                <p className="text-xs text-muted mt-2 line-clamp-2">{c.bio}</p>
+        <section id="how-it-works" className="mx-auto max-w-6xl px-5 py-16">
+          <h2 className="text-3xl font-bold">A learning feed that stays in your lane</h2>
+          <div className="mt-7 grid gap-4 md:grid-cols-3">
+            {[
+              ["01", "Choose your games", "Select one or many games during onboarding and change them whenever you want."],
+              ["02", "Swipe useful clips", "For You stays inside those games. Explore lets you branch out intentionally."],
+              ["03", "Save what works", "Organize tips into collections like Ahri Combos, Valorant Aim, or CS2 Smokes."],
+            ].map(([number, title, body]) => (
+              <div key={number} className="rounded-2xl border border-border bg-card p-6">
+                <div className="text-xs font-bold text-accent">{number}</div>
+                <h3 className="mt-6 text-lg font-bold">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      <section id="paths" className="max-w-6xl mx-auto px-5 py-16">
-        <h2 className="text-2xl font-bold">From random tips to real improvement</h2>
-        <p className="text-muted mt-1">
-          Discovery gets you the clip. Paths turn it into a sequence you can finish.
-        </p>
-        <div className="grid md:grid-cols-3 gap-4 mt-6">
-          {learningPaths.slice(0, 3).map((p) => (
-            <PathCard key={p.id} path={p} />
-          ))}
-        </div>
-      </section>
+        <section id="creators" className="mx-auto max-w-6xl px-5 py-16">
+          <h2 className="text-3xl font-bold">Follow creators who make you better</h2>
+          <p className="mt-2 text-muted">Real profiles, real gameplay, and a feed that learns who you trust.</p>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {creators.slice(0, 6).map((creator) => (
+              <div key={creator.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={creator.avatar} alt="" className="h-12 w-12 rounded-full border border-border" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 font-semibold">@{creator.username}{creator.verified && <VerifiedMark />}</div>
+                  <div className="mt-1 text-xs font-medium text-accent">{creator.mainFocus}</div>
+                  <p className="mt-2 line-clamp-2 text-xs text-muted">{creator.bio}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <section id="trending" className="max-w-6xl mx-auto px-5 py-16">
-        <h2 className="text-2xl font-bold">Trending tutorials</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          {tutorials.slice(0, 8).map((t) => (
-            <TutorialCard key={t.id} tutorial={t} />
-          ))}
-        </div>
-      </section>
+        <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
+          <h2 className="text-3xl font-bold">Trending community clips</h2>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {tutorials.slice(0, 8).map((clip) => <TutorialCard key={clip.id} tutorial={clip} />)}
+          </div>
+        </section>
 
-      <section className="max-w-6xl mx-auto px-5 py-20 text-center">
-        <h2 className="text-3xl font-bold">Ready to climb with intent?</h2>
-        <p className="text-muted mt-2">Pick your games. Tell us what you want to improve. We&apos;ll build the feed.</p>
-        <Link href="/onboarding" className="inline-block mt-6">
-          <Button size="lg">Build my feed</Button>
-        </Link>
-      </section>
+        <section className="mx-auto max-w-4xl px-5 py-24 text-center">
+          <h2 className="text-3xl font-bold md:text-4xl">Your next useful clip is waiting.</h2>
+          <p className="mt-3 text-muted">Pick the games you play and build a feed that helps you improve.</p>
+          <Link href="/onboarding" className="mt-7 inline-block"><Button size="lg">Build my feed</Button></Link>
+        </section>
+      </main>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted">
-        EZTips · Get better at the games you play
+        EZTips · Learn your games, one clip at a time
       </footer>
     </div>
   );

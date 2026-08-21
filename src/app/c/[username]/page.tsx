@@ -1,12 +1,11 @@
 "use client";
 
 import { FollowButton } from "@/components/actions";
-import { PathCard, TutorialCard } from "@/components/cards";
+import { TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button, RankBadge, Tabs, VerifiedMark } from "@/components/ui";
 import { getCreator } from "@/data/creators";
 import { getGame } from "@/data/games";
-import { pathsByGame } from "@/data/paths";
 import { tutorialsByCreator } from "@/data/tutorials";
 import { formatCount } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -17,11 +16,10 @@ export default function CreatorPage() {
   const { username } = useParams<{ username: string }>();
   const creator = getCreator(username);
   const { toast } = useApp();
-  const [tab, setTab] = useState("tutorials");
+  const [tab, setTab] = useState("videos");
   if (!creator) return notFound();
   const game = getGame(creator.gameId);
   const tuts = tutorialsByCreator(creator.id);
-  const paths = pathsByGame(creator.gameId).slice(0, 3);
 
   return (
     <AppShell publicPage>
@@ -65,32 +63,24 @@ export default function CreatorPage() {
         <Tabs
           className="mt-8"
           tabs={[
-            { id: "tutorials", label: "Tutorials" },
-            { id: "guides", label: "Guides" },
-            { id: "paths", label: "Learning Paths" },
+            { id: "videos", label: "Videos" },
+            { id: "popular", label: "Popular" },
             { id: "about", label: "About" },
           ]}
           value={tab}
           onChange={setTab}
         />
-        {tab === "tutorials" && (
+        {tab === "videos" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
             {tuts.map((t) => (
               <TutorialCard key={t.id} tutorial={t} />
             ))}
           </div>
         )}
-        {tab === "guides" && (
+        {tab === "popular" && (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {tuts.filter((t) => t.duration > 45).map((t) => (
+            {[...tuts].sort((a, b) => b.views - a.views).map((t) => (
               <TutorialCard key={t.id} tutorial={t} />
-            ))}
-          </div>
-        )}
-        {tab === "paths" && (
-          <div className="grid md:grid-cols-3 gap-4 mt-6">
-            {paths.map((p) => (
-              <PathCard key={p.id} path={p} />
             ))}
           </div>
         )}

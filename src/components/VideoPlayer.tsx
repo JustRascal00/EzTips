@@ -34,7 +34,7 @@ export function VideoPlayer({
   const ref = useRef<HTMLVideoElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [speed, setSpeed] = useState(1);
@@ -148,6 +148,7 @@ export function VideoPlayer({
         ref={ref}
         src={src}
         poster={poster}
+        muted={muted}
         playsInline
         className="h-full w-full object-cover"
         onClick={toggle}

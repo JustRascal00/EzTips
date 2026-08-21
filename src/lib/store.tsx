@@ -100,6 +100,7 @@ type Store = Persist & {
   createCollection: (name: string, tutorialId?: string) => void;
   toggleFollowCreator: (id: string) => void;
   toggleFollowGame: (id: string) => void;
+  toggleSelectedGame: (id: string) => void;
   addXp: (amount: number, reason?: string) => void;
   completeTutorial: (id: string) => void;
   completeLesson: (pathId: string, lessonId: string) => void;
@@ -260,6 +261,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const toggleSelectedGame = useCallback(
+    (id: string) => {
+      const removing = stateRef.current.selectedGames.includes(id);
+      if (removing && stateRef.current.selectedGames.length === 1) {
+        toast("Keep at least one game in your feed");
+        return;
+      }
+      setState((s) => ({
+        ...s,
+        selectedGames: s.selectedGames.includes(id)
+          ? s.selectedGames.filter((gameId) => gameId !== id)
+          : [...s.selectedGames, id],
+      }));
+      toast(removing ? "Removed from your feed" : "Added to your feed");
+    },
+    [toast],
+  );
+
   const completeTutorial = useCallback(
     (id: string) => {
       if (stateRef.current.completedTutorials.includes(id)) return;
@@ -337,6 +356,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       createCollection,
       toggleFollowCreator,
       toggleFollowGame,
+      toggleSelectedGame,
       addXp,
       completeTutorial,
       completeLesson,
@@ -359,6 +379,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     createCollection,
     toggleFollowCreator,
     toggleFollowGame,
+    toggleSelectedGame,
     addXp,
     completeTutorial,
     completeLesson,

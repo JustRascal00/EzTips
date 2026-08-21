@@ -77,7 +77,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="fade-up">
             <h1 className="text-3xl font-bold">What games do you play?</h1>
-            <p className="text-muted mt-2">Select as many as you want. This shapes your feed and hubs.</p>
+            <p className="text-muted mt-2">Select one or more. Your For You feed will only show clips from these games.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
               {games.map((g) => (
                 <GameCard
@@ -100,7 +100,7 @@ export default function OnboardingPage() {
           <div className="fade-up">
             <h1 className="text-3xl font-bold">What do you want to improve?</h1>
             <p className="text-muted mt-2">
-              Options change with the games you picked. Be specific — it&apos;s how we rank tutorials.
+              Pick the topics you care about. We&apos;ll use them to rank community clips in your feed.
             </p>
             <div className="space-y-8 mt-8">
               {selectedGames.map((g) => (
@@ -143,8 +143,7 @@ export default function OnboardingPage() {
           <div className="fade-up">
             <h1 className="text-3xl font-bold">What&apos;s your skill level?</h1>
             <p className="text-muted mt-2">
-              We use this to personalize tutorials — beginner clips won&apos;t bury matchup-specific
-              ones if you&apos;re already climbing.
+              We&apos;ll match the difficulty of community tips to where you are now.
             </p>
             <div className="grid sm:grid-cols-2 gap-3 mt-8">
               {levels.map((lv) => (

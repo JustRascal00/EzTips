@@ -6,13 +6,13 @@ import { cn } from "@/lib/cn";
 import { useApp } from "@/lib/store";
 import {
   Bell,
-  BookOpen,
+  Bookmark,
   Compass,
-  GraduationCap,
+  Gamepad2,
   Home,
-  Library,
+  PlusSquare,
   Settings,
-  Users,
+  UserRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -22,9 +22,10 @@ import { Avatar } from "../ui";
 const nav = (loggedIn: boolean) => [
   { href: loggedIn ? "/home" : "/", label: "Home", icon: Home },
   { href: "/explore", label: "Explore", icon: Compass },
-  { href: "/learn", label: "Learn", icon: GraduationCap },
-  { href: "/library", label: "Library", icon: Library },
-  { href: "/following", label: "Following", icon: Users },
+  { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/upload", label: "Upload", icon: PlusSquare },
+  { href: "/library", label: "Saved", icon: Bookmark },
+  { href: "/u/playerone", label: "Profile", icon: UserRound },
 ];
 
 export function Sidebar({
@@ -140,9 +141,10 @@ export function MobileNav() {
   const items = [
     { href: "/home", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
-    { href: "/upload", label: "Create", icon: BookOpen },
-    { href: "/learn", label: "Learn", icon: GraduationCap },
-    { href: `/u/${currentUser.username}`, label: "Profile", icon: Users },
+    { href: "/games", label: "Games", icon: Gamepad2 },
+    { href: "/upload", label: "Upload", icon: PlusSquare },
+    { href: "/library", label: "Saved", icon: Bookmark },
+    { href: `/u/${currentUser.username}`, label: "Profile", icon: UserRound },
   ];
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 h-16 border-t border-border bg-sidebar/95 backdrop-blur flex">

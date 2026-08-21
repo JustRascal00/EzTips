@@ -2,12 +2,13 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui";
+import { cn } from "@/lib/cn";
 import { games } from "@/data/games";
 import { useApp } from "@/lib/store";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
-  const { currentUser, selectedGames, skillLevel, logout } = useApp();
+  const { currentUser, selectedGames, skillLevel, toggleSelectedGame, logout } = useApp();
   const router = useRouter();
 
   return (
@@ -29,11 +30,26 @@ export default function SettingsPage() {
           </div>
         </section>
         <section className="mt-4 rounded-2xl border border-border bg-card p-5">
-          <h2 className="font-semibold">Learning</h2>
-          <p className="text-sm text-muted mt-2">
-            EZTips is built to convert a useful clip into a path — not to keep you scrolling. Daily
-            goal defaults to 3 tutorials.
-          </p>
+          <h2 className="font-semibold">Games in your feed</h2>
+          <p className="mt-2 text-sm text-muted">For You only shows clips tagged with the games selected here.</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {games.map((game) => {
+              const active = selectedGames.includes(game.id);
+              return (
+                <button
+                  key={game.id}
+                  type="button"
+                  onClick={() => toggleSelectedGame(game.id)}
+                  className={cn(
+                    "rounded-full border px-3 py-2 text-xs font-semibold transition-colors",
+                    active ? "border-accent bg-accent/15 text-text" : "border-border bg-elevated text-muted hover:text-text",
+                  )}
+                >
+                  {active ? "✓ " : "+ "}{game.name}
+                </button>
+              );
+            })}
+          </div>
         </section>
         <Button
           variant="danger"

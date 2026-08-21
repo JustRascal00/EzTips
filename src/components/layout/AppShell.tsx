@@ -63,14 +63,14 @@ export function AppShell({
               className="ml-auto inline-flex items-center gap-2 h-10 px-3 rounded-xl bg-card border border-border text-sm hover:bg-hover transition-colors duration-200"
             >
               <Plus className="h-4 w-4" />
-              Create
+              Upload
             </Link>
           ) : (
             <Link
               href="/onboarding"
               className="ml-auto inline-flex items-center h-10 px-4 rounded-xl bg-accent text-sm font-medium hover:bg-accent-hover"
             >
-              Start Learning
+              Build my feed
             </Link>
           )}
         </header>

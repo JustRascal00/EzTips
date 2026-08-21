@@ -1,24 +1,17 @@
 "use client";
 
-import { PathCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
 import { Progress, RankBadge } from "@/components/ui";
 import { achievements } from "@/data/notifications";
 import { games } from "@/data/games";
-import { learningPaths } from "@/data/paths";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/cn";
 import { useParams } from "next/navigation";
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
-  const { currentUser, selectedGames, collections, followedCreators, pathProgress } = useApp();
+  const { currentUser, selectedGames, collections, followedCreators } = useApp();
   const user = currentUser;
-
-  const completedPaths = learningPaths.filter((p) => {
-    const done = pathProgress[p.id]?.length ?? 0;
-    return done > 0;
-  });
 
   return (
     <AppShell>
@@ -80,7 +73,7 @@ export default function UserProfilePage() {
               .map((c) => (
                 <div key={c.id} className="rounded-2xl border border-border bg-card p-4">
                   <div className="font-semibold">{c.name}</div>
-                  <div className="text-sm text-muted">{c.tutorialIds.length} tutorials</div>
+                  <div className="text-sm text-muted">{c.tutorialIds.length} clips</div>
                 </div>
               ))}
           </div>
@@ -104,18 +97,6 @@ export default function UserProfilePage() {
           </div>
         </section>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Recently completed learning paths</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {completedPaths.map((p) => (
-              <PathCard
-                key={p.id}
-                path={p}
-                progress={Math.round(((pathProgress[p.id]?.length ?? 0) / p.lessons.length) * 100)}
-              />
-            ))}
-          </div>
-        </section>
       </div>
     </AppShell>
   );

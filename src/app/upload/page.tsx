@@ -20,11 +20,6 @@ export default function UploadPage() {
   const [character, setCharacter] = useState("Ahri");
   const [level, setLevel] = useState("intermediate");
   const [tags, setTags] = useState("Ahri, MidLane");
-  const [desc, setDesc] = useState("");
-  const [learn, setLearn] = useState("");
-  const [k1, setK1] = useState("");
-  const [k2, setK2] = useState("");
-  const [k3, setK3] = useState("");
   const [thumb, setThumb] = useState(0);
 
   const g = games.find((x) => x.id === game);
@@ -38,8 +33,9 @@ export default function UploadPage() {
   return (
     <AppShell>
       <div className="px-6 py-8 max-w-3xl">
-        <h1 className="text-3xl font-bold">Create tutorial</h1>
-        <p className="text-muted mt-1">Drop a clip. Tell players what they’ll walk away with. Publish.</p>
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Creator studio</div>
+        <h1 className="mt-2 text-3xl font-bold">Upload a gaming clip</h1>
+        <p className="text-muted mt-1">One useful moment is enough. Add the game, topics, and publish.</p>
 
         <label
           onDragOver={(e) => e.preventDefault()}
@@ -74,7 +70,7 @@ export default function UploadPage() {
         </label>
 
         <div className="mt-8 space-y-4">
-          <Field label="Tutorial Title">
+          <Field label="Caption / title">
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -123,22 +119,9 @@ export default function UploadPage() {
           <Field label="Tags">
             <input value={tags} onChange={(e) => setTags(e.target.value)} className={inputCls} />
           </Field>
-          <Field label="Description">
-            <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} className={inputCls} />
-          </Field>
-          <Field label="What will viewers learn?">
-            <input
-              value={learn}
-              onChange={(e) => setLearn(e.target.value)}
-              placeholder="How to punish Zed when his W is on cooldown."
-              className={inputCls}
-            />
-          </Field>
-          <div>
-            <div className="text-sm font-medium mb-2">Key Takeaways (optional)</div>
-            <input value={k1} onChange={(e) => setK1(e.target.value)} placeholder="1." className={cn(inputCls, "mb-2")} />
-            <input value={k2} onChange={(e) => setK2(e.target.value)} placeholder="2." className={cn(inputCls, "mb-2")} />
-            <input value={k3} onChange={(e) => setK3(e.target.value)} placeholder="3." className={inputCls} />
+          <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted">
+            Your clip will appear in feeds for <span className="font-semibold text-text">{g?.name}</span>
+            {category ? <> under <span className="font-semibold text-text">{category}</span></> : null}. A single 20–60 second tip is enough—no course or lesson setup required.
           </div>
           {thumbs.length > 0 && (
             <div>
@@ -166,11 +149,11 @@ export default function UploadPage() {
           size="lg"
           className="mt-8"
           onClick={() => {
-            toast("Tutorial published");
+            toast("Clip published");
             router.push("/home");
           }}
         >
-          Publish Tutorial
+          Publish clip
         </Button>
       </div>
     </AppShell>

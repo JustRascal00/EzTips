@@ -9,7 +9,6 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { Chip, RankBadge, VerifiedMark } from "@/components/ui";
 import { getCreator } from "@/data/creators";
 import { getGame } from "@/data/games";
-import { getPath } from "@/data/paths";
 import { getTutorial, tutorials } from "@/data/tutorials";
 import { formatDuration, formatCount, skillLabel } from "@/lib/format";
 import { useApp } from "@/lib/store";
@@ -20,19 +19,16 @@ import { useEffect } from "react";
 
 export function TutorialView({ slug }: { slug: string }) {
   const tutorial = getTutorial(slug);
-  const { liked, toggleLike, addHistory, completeTutorial, toast } = useApp();
+  const { liked, toggleLike, addHistory, toast } = useApp();
 
   useEffect(() => {
     if (!tutorial) return;
     addHistory(tutorial.id);
-    const t = window.setTimeout(() => completeTutorial(tutorial.id), 6000);
-    return () => clearTimeout(t);
-  }, [tutorial?.id, addHistory, completeTutorial]);
+  }, [tutorial?.id, addHistory]);
 
   if (!tutorial) return notFound();
   const game = getGame(tutorial.gameId);
   const creator = getCreator(tutorial.creatorId);
-  const path = tutorial.pathId ? getPath(tutorial.pathId) : undefined;
   const related = tutorials
     .filter(
       (t) =>
@@ -47,17 +43,6 @@ export function TutorialView({ slug }: { slug: string }) {
       publicPage
       right={
         <RightRail>
-          {path && (
-            <RailSection title="Master this">
-              <Link
-                href={`/learn/${path.slug}`}
-                className="block rounded-2xl border border-accent/30 bg-accent/10 p-3 text-sm font-medium hover:bg-accent/15"
-              >
-                Want to actually master this?
-                <div className="mt-1">{path.title} →</div>
-              </Link>
-            </RailSection>
-          )}
           <RailSection title="Related">
             <div className="space-y-3">
               {related.slice(0, 4).map((t) => (
@@ -145,11 +130,11 @@ export function TutorialView({ slug }: { slug: string }) {
         </div>
 
         <section className="mt-10">
-          <h2 className="text-lg font-semibold">What you&apos;ll learn</h2>
+          <h2 className="text-lg font-semibold">About this clip</h2>
           <p className="text-muted mt-2 leading-relaxed">{tutorial.learn}</p>
         </section>
         <section className="mt-8">
-          <h2 className="text-lg font-semibold">Key Takeaways</h2>
+          <h2 className="text-lg font-semibold">Key points</h2>
           <ol className="mt-3 space-y-2">
             {tutorial.takeaways.map((k, i) => (
               <li key={k} className="flex gap-3 text-sm leading-relaxed">
@@ -160,7 +145,7 @@ export function TutorialView({ slug }: { slug: string }) {
           </ol>
         </section>
         <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-4">Related Tutorials</h2>
+          <h2 className="text-lg font-semibold mb-4">Related clips</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {related.map((t) => (
               <TutorialCard key={t.id} tutorial={t} />

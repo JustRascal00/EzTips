@@ -10,12 +10,11 @@ import { useState } from "react";
 
 export default function LibraryPage() {
   const { saved, liked, history, collections } = useApp();
-  const [tab, setTab] = useState("continue");
+  const [tab, setTab] = useState("saved");
 
   const byIds = (ids: string[]) =>
     ids.map((id) => tutorials.find((t) => t.id === id)).filter(Boolean);
 
-  const continueList = byIds(history).slice(0, 8);
   const savedList = byIds(saved);
   const likedList = byIds(liked);
   const histList = byIds(history);
@@ -23,13 +22,12 @@ export default function LibraryPage() {
   return (
     <AppShell>
       <div className="px-6 py-8 max-w-5xl">
-        <h1 className="text-3xl font-bold">Library</h1>
-        <p className="text-muted mt-1">Your knowledge base — saved clips, collections, history.</p>
+        <h1 className="text-3xl font-bold">Saved</h1>
+        <p className="text-muted mt-1">Keep useful clips organized for your next queue.</p>
         <Tabs
           className="mt-6"
           tabs={[
-            { id: "continue", label: "Continue Learning" },
-            { id: "saved", label: "Saved Tutorials" },
+            { id: "saved", label: "Saved Clips" },
             { id: "collections", label: "Collections" },
             { id: "liked", label: "Liked" },
             { id: "history", label: "History" },
@@ -38,35 +36,15 @@ export default function LibraryPage() {
           onChange={setTab}
         />
 
-        {tab === "continue" && (
-          <div className="mt-6">
-            {continueList.length === 0 ? (
-              <EmptyState
-                title="Nothing to continue yet"
-                body="Watch a tutorial and it’ll show up here so you can pick up where you left off."
-                action={
-                  <Link href="/explore">
-                    <Button>Explore tutorials</Button>
-                  </Link>
-                }
-              />
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {continueList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)}
-              </div>
-            )}
-          </div>
-        )}
-
         {tab === "saved" && (
           <div className="mt-6">
             {savedList.length === 0 ? (
               <EmptyState
                 title="Your library is empty"
-                body="Save useful tutorials and they’ll appear here."
+                body="Save useful clips and they’ll appear here."
                 action={
                   <Link href="/explore">
-                    <Button>Explore tutorials</Button>
+                    <Button>Explore clips</Button>
                   </Link>
                 }
               />
@@ -86,7 +64,7 @@ export default function LibraryPage() {
                 <div key={c.id} className="rounded-2xl border border-border bg-card p-5">
                   <h3 className="font-semibold">{c.name}</h3>
                   <p className="text-sm text-muted mt-1">
-                    {c.tutorialIds.length} tutorials {c.public ? "· Public" : "· Private"}
+                    {c.tutorialIds.length} clips {c.public ? "· Public" : "· Private"}
                   </p>
                 </div>
               ))}
@@ -110,7 +88,7 @@ export default function LibraryPage() {
           <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {likedList.length === 0 ? (
               <div className="col-span-full">
-                <EmptyState title="No liked tutorials" body="Like a clip and it will land here." />
+                <EmptyState title="No liked clips" body="Like a clip and it will land here." />
               </div>
             ) : (
               likedList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)

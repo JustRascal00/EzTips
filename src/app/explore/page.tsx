@@ -63,7 +63,7 @@ export default function ExplorePage() {
     >
       <div className="px-6 py-8 max-w-5xl">
         <h1 className="text-3xl font-bold">Explore</h1>
-        <p className="text-muted mt-1">Search first. Then browse by game, skill, or what&apos;s moving.</p>
+        <p className="text-muted mt-1">Discover community videos outside your usual feed by game, topic, or creator.</p>
         <SearchBar large className="mt-6" />
 
         {yours.length > 0 && (
@@ -96,7 +96,7 @@ export default function ExplorePage() {
                 className="rounded-2xl border border-border bg-card p-4 hover:bg-hover transition-colors duration-200"
               >
                 <div className="font-semibold">{s.name}</div>
-                <div className="text-xs text-muted mt-1">{s.tutorials} tutorials</div>
+                <div className="text-xs text-muted mt-1">{s.tutorials} clips</div>
               </Link>
             ))}
           </div>
@@ -104,7 +104,7 @@ export default function ExplorePage() {
 
         <section className="mt-10">
           <div className="flex items-end justify-between gap-4 flex-wrap">
-            <h2 className="text-lg font-semibold">Trending Tutorials</h2>
+            <h2 className="text-lg font-semibold">Trending Videos</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
             <FilterSelect

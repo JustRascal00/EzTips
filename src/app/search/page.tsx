@@ -1,6 +1,6 @@
 "use client";
 
-import { CreatorCard, GameCard, PathCard, TutorialCard } from "@/components/cards";
+import { CreatorCard, GameCard, TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
 import { SearchBar } from "@/components/SearchBar";
 import { Chip, EmptyState, FilterSelect } from "@/components/ui";
@@ -27,8 +27,7 @@ function Results() {
     (tuts.length === 0 &&
       result.games.length === 0 &&
       result.creators.length === 0 &&
-      result.characters.length === 0 &&
-      result.paths.length === 0);
+      result.characters.length === 0);
 
   return (
     <div className="px-6 py-8 max-w-5xl">
@@ -76,7 +75,7 @@ function Results() {
 
       {tuts.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Tutorials</h2>
+          <h2 className="text-lg font-semibold mb-3">Videos</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {tuts.map((t) => (
               <TutorialCard key={t.id} tutorial={t} />
@@ -123,16 +122,6 @@ function Results() {
                 </Link>
               );
             })}
-          </div>
-        </section>
-      )}
-      {result.paths.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Learning Paths</h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {result.paths.map((p) => (
-              <PathCard key={p.id} path={p} />
-            ))}
           </div>
         </section>
       )}
