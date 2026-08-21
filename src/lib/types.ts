@@ -55,6 +55,9 @@ export type Tutorial = {
   skillLevel: SkillLevel;
   duration: number;
   creatorId: string;
+  creatorUsername?: string;
+  creatorDisplayName?: string;
+  creatorAvatar?: string;
   thumbnail: string;
   videoUrl: string;
   views: number;
@@ -64,6 +67,7 @@ export type Tutorial = {
   comments: number;
   createdAt: string;
   pathId?: string;
+  communityUpload?: boolean;
 };
 
 export type PathLesson = {

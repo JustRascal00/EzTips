@@ -5,15 +5,22 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui";
 import { games } from "@/data/games";
 import { useApp } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Check, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function OnboardingPage() {
   const { completeOnboarding } = useApp();
+  const { configured, loading, user } = useAuth();
   const router = useRouter();
   const [picked, setPicked] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (configured && !loading && !user) router.replace("/auth?mode=signup&next=/onboarding");
+  }, [configured, loading, router, user]);
 
   const visibleGames = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -108,13 +115,14 @@ export default function OnboardingPage() {
           </p>
           <Button
             size="lg"
-            disabled={picked.length === 0}
-            onClick={() => {
-              completeOnboarding(picked);
+            disabled={picked.length === 0 || saving}
+            onClick={async () => {
+              setSaving(true);
+              await completeOnboarding(picked);
               router.push("/home");
             }}
           >
-            Start watching
+            {saving ? "Saving…" : "Start watching"}
           </Button>
         </div>
 

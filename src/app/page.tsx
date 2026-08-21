@@ -8,6 +8,7 @@ import { games } from "@/data/games";
 import { tutorials } from "@/data/tutorials";
 import { formatCount } from "@/lib/format";
 import { useApp } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { Bookmark, Heart, MessageCircle, Play, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -67,6 +68,7 @@ function FeedPreview() {
 
 export default function MarketingPage() {
   const { hydrated, isLoggedIn } = useApp();
+  const { configured } = useAuth();
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
@@ -77,6 +79,7 @@ export default function MarketingPage() {
   }, [hydrated, isLoggedIn, router]);
 
   if (!ready) return <div className="min-h-screen bg-bg" />;
+  const signupHref = configured ? "/auth?mode=signup" : "/onboarding";
 
   return (
     <div className="min-h-screen overflow-hidden bg-bg">
@@ -89,7 +92,10 @@ export default function MarketingPage() {
             <a href="#how-it-works" className="hover:text-text">How it works</a>
             <a href="#trending" className="hover:text-text">Explore</a>
           </nav>
-          <Link href="/onboarding"><Button>Build my feed</Button></Link>
+          <div className="flex items-center gap-3">
+            {configured && <Link href="/auth" className="text-sm font-semibold text-muted hover:text-white">Sign in</Link>}
+            <Link href={signupHref}><Button>{configured ? "Create account" : "Build my feed"}</Button></Link>
+          </div>
         </div>
       </header>
 
@@ -105,7 +111,7 @@ export default function MarketingPage() {
               Choose the games you play and scroll a feed of tips, mechanics, strategies, and guides uploaded by real players.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/onboarding"><Button size="lg">Choose my games</Button></Link>
+              <Link href={signupHref}><Button size="lg">Choose my games</Button></Link>
               <a href="#trending"><Button size="lg" variant="secondary">Watch community clips</Button></a>
             </div>
             <div className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-border pt-6 text-sm">
@@ -122,7 +128,7 @@ export default function MarketingPage() {
           <h2 className="mt-3 text-3xl font-bold">Pick the games you actually play</h2>
           <p className="mt-2 text-muted">Choose one or several. Your For You feed stays focused on those games.</p>
           <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {games.map((game) => <GameCard key={game.id} game={game} href="/onboarding" />)}
+            {games.map((game) => <GameCard key={game.id} game={game} href={signupHref} />)}
           </div>
         </section>
 
@@ -171,7 +177,7 @@ export default function MarketingPage() {
         <section className="mx-auto max-w-4xl px-5 py-24 text-center">
           <h2 className="text-3xl font-bold md:text-4xl">Your next useful clip is waiting.</h2>
           <p className="mt-3 text-muted">Pick the games you play and build a feed that helps you improve.</p>
-          <Link href="/onboarding" className="mt-7 inline-block"><Button size="lg">Build my feed</Button></Link>
+          <Link href={signupHref} className="mt-7 inline-block"><Button size="lg">Build my feed</Button></Link>
         </section>
       </main>
 

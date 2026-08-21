@@ -9,26 +9,32 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { Chip, RankBadge, VerifiedMark } from "@/components/ui";
 import { getCreator } from "@/data/creators";
 import { getGame } from "@/data/games";
-import { getTutorial, tutorials } from "@/data/tutorials";
+import { tutorials } from "@/data/tutorials";
 import { formatDuration, formatCount, skillLabel } from "@/lib/format";
 import { useApp } from "@/lib/store";
 import { Heart, Share2 } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { useEffect } from "react";
+import type { Tutorial } from "@/lib/types";
 
-export function TutorialView({ slug }: { slug: string }) {
-  const tutorial = getTutorial(slug);
+export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
   const { liked, toggleLike, addHistory, toast } = useApp();
+  const tutorialId = tutorial.id;
 
   useEffect(() => {
-    if (!tutorial) return;
-    addHistory(tutorial.id);
-  }, [tutorial?.id, addHistory]);
+    addHistory(tutorialId);
+  }, [tutorialId, addHistory]);
 
-  if (!tutorial) return notFound();
   const game = getGame(tutorial.gameId);
-  const creator = getCreator(tutorial.creatorId);
+  const staticCreator = getCreator(tutorial.creatorId);
+  const creator = staticCreator ?? (tutorial.creatorUsername ? {
+    id: tutorial.creatorId,
+    username: tutorial.creatorUsername,
+    displayName: tutorial.creatorDisplayName || tutorial.creatorUsername,
+    avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}`,
+    verified: false,
+    credential: { label: "Community creator" },
+  } : undefined);
   const related = tutorials
     .filter(
       (t) =>
@@ -77,7 +83,7 @@ export function TutorialView({ slug }: { slug: string }) {
         <h1 className="text-3xl font-bold mt-2 tracking-tight">{tutorial.title}</h1>
         {creator && (
           <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
-            <Link href={`/c/${creator.username}`} className="flex items-center gap-3">
+            <Link href={staticCreator ? `/c/${creator.username}` : `/u/${creator.username}`} className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={creator.avatar} alt="" className="h-11 w-11 rounded-full border border-border" />
               <div>
@@ -133,17 +139,19 @@ export function TutorialView({ slug }: { slug: string }) {
           <h2 className="text-lg font-semibold">About this clip</h2>
           <p className="text-muted mt-2 leading-relaxed">{tutorial.learn}</p>
         </section>
-        <section className="mt-8">
-          <h2 className="text-lg font-semibold">Key points</h2>
-          <ol className="mt-3 space-y-2">
-            {tutorial.takeaways.map((k, i) => (
-              <li key={k} className="flex gap-3 text-sm leading-relaxed">
-                <span className="text-muted w-5">{String(i + 1).padStart(2, "0")}</span>
-                {k}
-              </li>
-            ))}
-          </ol>
-        </section>
+        {tutorial.takeaways.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-lg font-semibold">Key points</h2>
+            <ol className="mt-3 space-y-2">
+              {tutorial.takeaways.map((k, i) => (
+                <li key={k} className="flex gap-3 text-sm leading-relaxed">
+                  <span className="text-muted w-5">{String(i + 1).padStart(2, "0")}</span>
+                  {k}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
         <section className="mt-10">
           <h2 className="text-lg font-semibold mb-4">Related clips</h2>
           <div className="grid sm:grid-cols-2 gap-4">

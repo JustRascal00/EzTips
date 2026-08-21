@@ -1,8 +1,13 @@
 "use client";
 
 import { AppProvider } from "@/lib/store";
+import { AuthProvider } from "@/lib/auth";
 import type { ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
-  return <AppProvider>{children}</AppProvider>;
+  return (
+    <AuthProvider>
+      <AppProvider>{children}</AppProvider>
+    </AuthProvider>
+  );
 }

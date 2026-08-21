@@ -1,7 +1,9 @@
 "use client";
 
 import { useApp } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { SearchBar } from "../SearchBar";
 import { ToastHost } from "../ToastHost";
@@ -27,7 +29,9 @@ export function AppShell({
   publicPage?: boolean;
 }) {
   const { hydrated, isLoggedIn } = useApp();
+  const { configured } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [notifs, setNotifs] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -40,8 +44,10 @@ export function AppShell({
   }, [collapseSidebar]);
 
   useEffect(() => {
-    if (hydrated && !isLoggedIn && !publicPage) router.replace("/");
-  }, [hydrated, isLoggedIn, router, publicPage]);
+    if (hydrated && !isLoggedIn && !publicPage) {
+      router.replace(configured ? `/auth?next=${encodeURIComponent(pathname)}` : "/");
+    }
+  }, [configured, hydrated, isLoggedIn, pathname, router, publicPage]);
 
   if (!hydrated || (!isLoggedIn && !publicPage)) {
     return (
@@ -67,7 +73,7 @@ export function AppShell({
             </Link>
           ) : (
             <Link
-              href="/onboarding"
+              href={configured ? "/auth?mode=signup" : "/onboarding"}
               className="ml-auto inline-flex items-center h-10 px-4 rounded-xl bg-accent text-sm font-medium hover:bg-accent-hover"
             >
               Build my feed

@@ -53,8 +53,8 @@ export default function SettingsPage() {
         <Button
           variant="danger"
           className="mt-6"
-          onClick={() => {
-            logout();
+          onClick={async () => {
+            await logout();
             router.push("/");
           }}
         >

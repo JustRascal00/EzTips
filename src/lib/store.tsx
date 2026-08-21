@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 import { notifications as seedNotifications } from "@/data/notifications";
+import { useAuth } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 import { currentUserSeed } from "@/data/creators";
 import { learningPaths } from "@/data/paths";
 import { tutorials } from "@/data/tutorials";
@@ -100,7 +102,7 @@ type Store = Persist & {
   xpBurst: number | null;
   currentUser: CurrentUser;
   isLoggedIn: boolean;
-  completeOnboarding: (games: string[]) => void;
+  completeOnboarding: (games: string[]) => Promise<void>;
   toggleLike: (id: string) => void;
   toggleHelpful: (id: string) => void;
   toggleSave: (id: string) => void;
@@ -121,16 +123,18 @@ type Store = Persist & {
   toast: (message: string) => void;
   dismissToast: (id: string) => void;
   markAllRead: () => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const Ctx = createContext<Store | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { configured, loading: authLoading, user, profile, signOut } = useAuth();
   const [state, setState] = useState<Persist>(defaults);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [xpBurst, setXpBurst] = useState<number | null>(null);
+  const [backendGames, setBackendGames] = useState<string[] | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -143,6 +147,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state, hydrated]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!configured || !user || !supabase) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.from("user_games").select("game_id").eq("user_id", user.id);
+      if (cancelled) return;
+      const rows = (data ?? []) as { game_id: string }[];
+      const ids = rows.map((item) => item.game_id);
+      setBackendGames(ids);
+      if (ids.length) setState((current) => ({ ...current, onboarded: true, selectedGames: ids, followedGames: ids }));
+    })();
+    return () => { cancelled = true; };
+  }, [configured, user]);
 
   const toast = useCallback((message: string) => {
     const id = Math.random().toString(36).slice(2);
@@ -164,7 +183,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   );
 
-  const completeOnboarding = useCallback((games: string[]) => {
+  const completeOnboarding = useCallback(async (games: string[]) => {
+    setBackendGames(games);
     setState((s) => ({
       ...s,
       onboarded: true,
@@ -177,7 +197,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       searches: [],
       videoSignals: {},
     }));
-  }, []);
+    const supabase = createClient();
+    if (supabase && user) {
+      await supabase.from("user_games").delete().eq("user_id", user.id);
+      if (games.length) {
+        await supabase.from("user_games").insert(games.map((gameId) => ({ user_id: user.id, game_id: gameId })));
+      }
+    }
+  }, [user]);
 
   const toggleLike = useCallback((id: string) => {
     setState((s) => {
@@ -277,20 +304,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleSelectedGame = useCallback(
     (id: string) => {
-      const removing = stateRef.current.selectedGames.includes(id);
-      if (removing && stateRef.current.selectedGames.length === 1) {
+      const currentGames = backendGames ?? stateRef.current.selectedGames;
+      const removing = currentGames.includes(id);
+      if (removing && currentGames.length === 1) {
         toast("Keep at least one game in your feed");
         return;
       }
-      setState((s) => ({
-        ...s,
-        selectedGames: s.selectedGames.includes(id)
-          ? s.selectedGames.filter((gameId) => gameId !== id)
-          : [...s.selectedGames, id],
-      }));
+      const nextGames = removing ? currentGames.filter((gameId) => gameId !== id) : [...currentGames, id];
+      setBackendGames(nextGames);
+      setState((s) => ({ ...s, selectedGames: nextGames }));
+      const supabase = createClient();
+      if (supabase && user) {
+        if (removing) void supabase.from("user_games").delete().eq("user_id", user.id).eq("game_id", id);
+        else void supabase.from("user_games").insert({ user_id: user.id, game_id: id });
+      }
       toast(removing ? "Removed from your feed" : "Added to your feed");
     },
-    [toast],
+    [backendGames, toast, user],
   );
 
   const completeTutorial = useCallback(
@@ -389,25 +419,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await signOut();
+    setBackendGames(null);
     localStorage.removeItem(STORAGE_KEY);
     setState({ ...defaults, onboarded: false, selectedGames: [], skillLevel: null });
-  }, []);
+  }, [signOut]);
 
   const store: Store = useMemo(() => {
     const currentUser: CurrentUser = {
       ...currentUserSeed,
+      username: profile?.username ?? currentUserSeed.username,
+      displayName: profile?.display_name ?? user?.email?.split("@")[0] ?? currentUserSeed.displayName,
+      avatar: profile?.avatar_url || currentUserSeed.avatar,
+      bio: profile?.bio || currentUserSeed.bio,
       xp: state.xp,
       level: 18 + Math.floor(Math.max(0, state.xp - currentUserSeed.xp) / 400),
     };
 
     return {
       ...state,
-      hydrated,
+      selectedGames: backendGames ?? state.selectedGames,
+      hydrated: hydrated && !authLoading,
       toasts,
       xpBurst,
       currentUser,
-      isLoggedIn: state.onboarded,
+      isLoggedIn: configured ? Boolean(user) : state.onboarded,
       completeOnboarding,
       toggleLike,
       toggleHelpful,
@@ -458,6 +495,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dismissToast,
     markAllRead,
     logout,
+    authLoading,
+    configured,
+    profile,
+    user,
+    backendGames,
   ]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

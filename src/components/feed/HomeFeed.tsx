@@ -9,6 +9,7 @@ import { tutorials } from "@/data/tutorials";
 import { cn } from "@/lib/cn";
 import { formatCount, skillLabel } from "@/lib/format";
 import { useApp, type VideoSignal } from "@/lib/store";
+import { fetchCommunityVideos } from "@/lib/supabase/videos";
 import type { Tutorial } from "@/lib/types";
 import { Heart, MessageCircle, Plus, Share2 } from "lucide-react";
 import Link from "next/link";
@@ -37,7 +38,7 @@ function personalizedOrder(list: Tutorial[], gameOrder: string[], behavior: Feed
     });
   };
 
-  tutorials.forEach((tutorial) => {
+  list.forEach((tutorial) => {
     let weight = 0;
     if (behavior.liked.includes(tutorial.id)) weight += 3;
     if (behavior.saved.includes(tutorial.id)) weight += 5;
@@ -142,7 +143,14 @@ function FeedItem({
   onActivate: () => void;
 }) {
   const game = games.find((item) => item.id === tutorial.gameId);
-  const creator = creators.find((item) => item.id === tutorial.creatorId);
+  const staticCreator = creators.find((item) => item.id === tutorial.creatorId);
+  const creator = staticCreator ?? (tutorial.creatorUsername ? {
+    id: tutorial.creatorId,
+    username: tutorial.creatorUsername,
+    displayName: tutorial.creatorDisplayName || tutorial.creatorUsername,
+    avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}`,
+    mainFocus: "Community creator",
+  } : undefined);
   const { liked, toggleLike, toast, recordVideoComplete, recordVideoShare } = useApp();
   const isLiked = liked.includes(tutorial.id);
   const itemRef = useRef<HTMLElement>(null);
@@ -194,7 +202,7 @@ function FeedItem({
         <div className="absolute bottom-5 left-4 right-[74px] z-20">
           {creator && (
             <div className="mb-3 flex items-center gap-2.5">
-              <Link href={`/c/${creator.username}`} className="flex min-w-0 items-center gap-2.5">
+              <Link href={staticCreator ? `/c/${creator.username}` : `/u/${creator.username}`} className="flex min-w-0 items-center gap-2.5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={creator.avatar}
@@ -273,6 +281,7 @@ export function HomeFeed() {
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [communityVideos, setCommunityVideos] = useState<Tutorial[]>([]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const behaviorSnapshot = useRef<FeedBehavior>({
     liked,
@@ -283,13 +292,21 @@ export function HomeFeed() {
     videoSignals,
   });
 
+  useEffect(() => {
+    let cancelled = false;
+    fetchCommunityVideos()
+      .then((items) => { if (!cancelled) setCommunityVideos(items); })
+      .catch(() => { /* Demo clips remain available if the backend is offline. */ });
+    return () => { cancelled = true; };
+  }, []);
+
   const availableGames = useMemo(() => {
     const ids = tab === "explore" ? games.map((game) => game.id) : selectedGames;
     return games.filter((game) => ids.includes(game.id));
   }, [selectedGames, tab]);
 
   const feed = useMemo(() => {
-    let list = tutorials;
+    let list = [...communityVideos, ...tutorials];
     if (tab === "following") {
       list = list.filter((tutorial) => followedCreators.includes(tutorial.creatorId));
     } else if (tab === "foryou" && selectedGames.length) {
@@ -303,7 +320,7 @@ export function HomeFeed() {
       list = personalizedOrder(list, gameOrder, behaviorSnapshot.current);
     }
     return list;
-  }, [activeGames, followedCreators, selectedGames, tab]);
+  }, [activeGames, communityVideos, followedCreators, selectedGames, tab]);
 
   const resetFeed = useCallback(() => {
     setActiveGames([]);
