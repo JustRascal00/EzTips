@@ -178,7 +178,7 @@ function FeedItem({
 export function HomeFeed() {
   const { selectedGames, followedCreators, addHistory } = useApp();
   const [tab, setTab] = useState<FeedTab>("foryou");
-  const [activeGame, setActiveGame] = useState("all");
+  const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -194,14 +194,24 @@ export function HomeFeed() {
     } else if (tab === "foryou" && selectedGames.length) {
       list = list.filter((tutorial) => selectedGames.includes(tutorial.gameId));
     }
-    if (activeGame !== "all") {
-      list = list.filter((tutorial) => tutorial.gameId === activeGame);
+    if (activeGames.length) {
+      list = list.filter((tutorial) => activeGames.includes(tutorial.gameId));
     }
     return list;
-  }, [activeGame, followedCreators, selectedGames, tab]);
+  }, [activeGames, followedCreators, selectedGames, tab]);
 
-  const resetFeed = useCallback((nextGame = "all") => {
-    setActiveGame(nextGame);
+  const resetFeed = useCallback(() => {
+    setActiveGames([]);
+    setActiveIndex(0);
+    scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const toggleGameFilter = useCallback((gameId: string) => {
+    setActiveGames((current) =>
+      current.includes(gameId)
+        ? current.filter((id) => id !== gameId)
+        : [...current, gameId],
+    );
     setActiveIndex(0);
     scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
@@ -258,7 +268,7 @@ export function HomeFeed() {
             onClick={() => resetFeed()}
             className={cn(
               "shrink-0 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
-              activeGame === "all"
+              activeGames.length === 0
                 ? "border-accent bg-accent text-white"
                 : "border-border bg-card text-muted hover:text-white",
             )}
@@ -269,10 +279,11 @@ export function HomeFeed() {
             <button
               type="button"
               key={game.id}
-              onClick={() => resetFeed(game.id)}
+              onClick={() => toggleGameFilter(game.id)}
+              aria-pressed={activeGames.includes(game.id)}
               className={cn(
                 "flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                activeGame === game.id
+                activeGames.includes(game.id)
                   ? "border-accent bg-accent/15 text-white"
                   : "border-border bg-card text-muted hover:text-white",
               )}
