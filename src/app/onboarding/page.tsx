@@ -1,192 +1,127 @@
 "use client";
 
-import { Logo } from "@/components/Logo";
 import { GameCard } from "@/components/cards";
-import { Button, Chip } from "@/components/ui";
+import { Logo } from "@/components/Logo";
+import { Button } from "@/components/ui";
 import { games } from "@/data/games";
-import { cn } from "@/lib/cn";
 import { useApp } from "@/lib/store";
-import type { SkillLevel } from "@/lib/types";
+import { Check, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
-const levels: { id: SkillLevel; title: string; body: string }[] = [
-  {
-    id: "beginner",
-    title: "Beginner",
-    body: "Still learning the rules, roles, and default habits.",
-  },
-  {
-    id: "intermediate",
-    title: "Intermediate",
-    body: "You know the game. You want cleaner decisions.",
-  },
-  {
-    id: "advanced",
-    title: "Advanced",
-    body: "High rank or high hours. You want specifics.",
-  },
-  {
-    id: "competitive",
-    title: "Competitive",
-    body: "Playing to climb or coach. Optimize every round.",
-  },
-];
 
 export default function OnboardingPage() {
   const { completeOnboarding } = useApp();
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [picked, setPicked] = useState<string[]>(["lol", "valorant"]);
-  const [goals, setGoals] = useState<Record<string, string[]>>({
-    lol: ["mid"],
-    valorant: ["aim"],
-  });
-  const [skill, setSkill] = useState<SkillLevel>("intermediate");
+  const [picked, setPicked] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
 
-  const selectedGames = useMemo(
-    () => games.filter((g) => picked.includes(g.id)),
-    [picked],
-  );
+  const visibleGames = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return games;
+    return games.filter((game) =>
+      [game.name, game.short, game.slug].some((value) => value.toLowerCase().includes(term)),
+    );
+  }, [query]);
 
-  const toggleGame = (id: string) => {
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  };
+  const selectedGames = games.filter((game) => picked.includes(game.id));
 
-  const toggleGoal = (gameId: string, goalId: string) => {
-    setGoals((g) => {
-      const cur = g[gameId] ?? [];
-      return {
-        ...g,
-        [gameId]: cur.includes(goalId) ? cur.filter((x) => x !== goalId) : [...cur, goalId],
-      };
-    });
+  const toggleGame = (gameId: string) => {
+    setPicked((current) =>
+      current.includes(gameId)
+        ? current.filter((id) => id !== gameId)
+        : [...current, gameId],
+    );
   };
 
   return (
     <div className="min-h-screen bg-bg">
-      <header className="h-16 px-6 flex items-center justify-between border-b border-border">
+      <header className="flex h-16 items-center justify-between border-b border-border px-5 md:px-8">
         <Logo />
-        <div className="text-sm text-muted">Step {step} of 3</div>
+        <div className="text-sm font-medium text-muted">Personalize your feed</div>
       </header>
-      <div className="max-w-4xl mx-auto px-5 py-10">
-        <div className="h-1 rounded-full bg-border mb-10 overflow-hidden">
-          <div className="h-full bg-accent transition-all duration-200" style={{ width: `${(step / 3) * 100}%` }} />
+
+      <main className="mx-auto max-w-5xl px-5 py-10 md:py-14">
+        <div className="max-w-2xl">
+          <div className="text-xs font-bold uppercase tracking-[0.2em] text-accent">One quick step</div>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">What games do you play?</h1>
+          <p className="mt-3 text-muted">
+            Choose one or more games. We&apos;ll start with a broad mix of useful community clips and learn what you like as you watch.
+          </p>
         </div>
 
-        {step === 1 && (
-          <div className="fade-up">
-            <h1 className="text-3xl font-bold">What games do you play?</h1>
-            <p className="text-muted mt-2">Select one or more. Your For You feed will only show clips from these games.</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
-              {games.map((g) => (
-                <GameCard
-                  key={g.id}
-                  game={g}
-                  selected={picked.includes(g.id)}
-                  onSelect={() => toggleGame(g.id)}
-                />
-              ))}
-            </div>
-            <div className="flex justify-end mt-8">
-              <Button size="lg" disabled={picked.length === 0} onClick={() => setStep(2)}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
+        <label className="mt-8 flex h-12 max-w-xl items-center gap-3 rounded-2xl border border-border bg-card px-4 focus-within:border-accent/60">
+          <Search className="h-5 w-5 shrink-0 text-muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search games"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="text-muted hover:text-text">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </label>
 
-        {step === 2 && (
-          <div className="fade-up">
-            <h1 className="text-3xl font-bold">What do you want to improve?</h1>
-            <p className="text-muted mt-2">
-              Pick the topics you care about. We&apos;ll use them to rank community clips in your feed.
-            </p>
-            <div className="space-y-8 mt-8">
-              {selectedGames.map((g) => (
-                <div key={g.id}>
-                  <h2 className="font-semibold mb-3">{g.name}</h2>
-                  <div className="flex flex-wrap gap-2">
-                    {g.goals.map((goal) => {
-                      const on = (goals[g.id] ?? []).includes(goal.id);
-                      return (
-                        <button
-                          key={goal.id}
-                          onClick={() => toggleGoal(g.id, goal.id)}
-                          className={cn(
-                            "h-10 px-4 rounded-xl border text-sm font-medium transition-colors duration-150",
-                            on
-                              ? "border-accent bg-accent/15 text-text"
-                              : "border-border bg-card text-muted hover:text-text hover:bg-hover",
-                          )}
-                        >
-                          {goal.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between mt-8">
-              <Button variant="ghost" onClick={() => setStep(1)}>
-                Back
-              </Button>
-              <Button size="lg" onClick={() => setStep(3)}>
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="fade-up">
-            <h1 className="text-3xl font-bold">What&apos;s your skill level?</h1>
-            <p className="text-muted mt-2">
-              We&apos;ll match the difficulty of community tips to where you are now.
-            </p>
-            <div className="grid sm:grid-cols-2 gap-3 mt-8">
-              {levels.map((lv) => (
-                <button
-                  key={lv.id}
-                  onClick={() => setSkill(lv.id)}
-                  className={cn(
-                    "text-left rounded-2xl border p-4 transition-colors duration-150",
-                    skill === lv.id
-                      ? "border-accent bg-accent/10"
-                      : "border-border bg-card hover:bg-hover",
-                  )}
-                >
-                  <div className="font-semibold">{lv.title}</div>
-                  <div className="text-sm text-muted mt-1">{lv.body}</div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {selectedGames.map((g) => (
-                <Chip key={g.id} active>
-                  {g.name}
-                </Chip>
-              ))}
-              <Chip>{levels.find((l) => l.id === skill)?.title}</Chip>
-            </div>
-            <div className="flex justify-between mt-8">
-              <Button variant="ghost" onClick={() => setStep(2)}>
-                Back
-              </Button>
-              <Button
-                size="lg"
-                onClick={() => {
-                  completeOnboarding(picked, goals, skill);
-                  router.push("/home");
-                }}
+        {selectedGames.length > 0 && (
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold text-muted">Your feed:</span>
+            {selectedGames.map((game) => (
+              <button
+                key={game.id}
+                type="button"
+                onClick={() => toggleGame(game.id)}
+                className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/15 px-3 py-1.5 text-xs font-semibold"
               >
-                Build my feed
-              </Button>
-            </div>
+                <Check className="h-3.5 w-3.5 text-accent" />
+                {game.name}
+                <X className="ml-0.5 h-3 w-3 text-muted" />
+              </button>
+            ))}
           </div>
         )}
-      </div>
+
+        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {visibleGames.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              selected={picked.includes(game.id)}
+              onSelect={() => toggleGame(game.id)}
+            />
+          ))}
+        </div>
+
+        {visibleGames.length === 0 && (
+          <div className="mt-7 rounded-2xl border border-dashed border-border py-14 text-center">
+            <h2 className="font-semibold">No games found</h2>
+            <p className="mt-1 text-sm text-muted">Try another name. More games can be added as the platform grows.</p>
+          </div>
+        )}
+
+        <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-border pt-6 sm:flex-row sm:items-center">
+          <p className="text-sm text-muted">
+            {picked.length
+              ? `${picked.length} ${picked.length === 1 ? "game" : "games"} selected`
+              : "Select at least one game to continue"}
+          </p>
+          <Button
+            size="lg"
+            disabled={picked.length === 0}
+            onClick={() => {
+              completeOnboarding(picked);
+              router.push("/home");
+            }}
+          >
+            Start watching
+          </Button>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted">
+          No topic quiz. No permanent skill label. Your feed improves naturally from what you watch, save, and follow.
+        </p>
+      </main>
     </div>
   );
 }

@@ -24,6 +24,14 @@ import type {
 
 const STORAGE_KEY = "eztips-state-v1";
 
+export type VideoSignal = {
+  starts: number;
+  completions: number;
+  skips: number;
+  rewatches: number;
+  shares: number;
+};
+
 type Persist = {
   onboarded: boolean;
   selectedGames: string[];
@@ -40,6 +48,8 @@ type Persist = {
   completedTutorials: string[];
   pathProgress: Record<string, string[]>;
   history: string[];
+  searches: string[];
+  videoSignals: Record<string, VideoSignal>;
   notifications: AppNotification[];
 };
 
@@ -51,7 +61,7 @@ const defaults: Persist = {
   liked: [],
   helpful: [],
   saved: [],
-  followedCreators: ["kai", "vex", "flick"],
+  followedCreators: [],
   followedGames: [],
   collections: [
     { id: "col-ahri", name: "Ahri Combos", tutorialIds: ["t2", "t9"], public: true },
@@ -60,14 +70,16 @@ const defaults: Persist = {
     { id: "col-jett", name: "Jett Smokes", tutorialIds: ["t5", "t10"], public: true },
   ],
   xp: currentUserSeed.xp,
-  completedLessons: ["l1", "l2", "l3", "m1", "m2", "a1"],
-  completedTutorials: ["t6", "t9"],
+  completedLessons: [],
+  completedTutorials: [],
   pathProgress: {
     "ahri-mastery": ["l1", "l2", "l3"],
     "mid-fundamentals": ["m1", "m2"],
     "aim-foundations": ["a1"],
   },
-  history: ["t6", "t1", "t5"],
+  history: [],
+  searches: [],
+  videoSignals: {},
   notifications: seedNotifications,
 };
 
@@ -88,11 +100,7 @@ type Store = Persist & {
   xpBurst: number | null;
   currentUser: CurrentUser;
   isLoggedIn: boolean;
-  completeOnboarding: (
-    games: string[],
-    goals: Record<string, string[]>,
-    skill: SkillLevel,
-  ) => void;
+  completeOnboarding: (games: string[]) => void;
   toggleLike: (id: string) => void;
   toggleHelpful: (id: string) => void;
   toggleSave: (id: string) => void;
@@ -105,6 +113,11 @@ type Store = Persist & {
   completeTutorial: (id: string) => void;
   completeLesson: (pathId: string, lessonId: string) => void;
   addHistory: (id: string) => void;
+  recordSearch: (query: string) => void;
+  recordVideoStart: (id: string) => void;
+  recordVideoComplete: (id: string) => void;
+  recordVideoSkip: (id: string) => void;
+  recordVideoShare: (id: string) => void;
   toast: (message: string) => void;
   dismissToast: (id: string) => void;
   markAllRead: () => void;
@@ -151,19 +164,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [toast],
   );
 
-  const completeOnboarding = useCallback(
-    (games: string[], goals: Record<string, string[]>, skill: SkillLevel) => {
-      setState((s) => ({
-        ...s,
-        onboarded: true,
-        selectedGames: games,
-        selectedGoals: goals,
-        skillLevel: skill,
-        followedGames: games,
-      }));
-    },
-    [],
-  );
+  const completeOnboarding = useCallback((games: string[]) => {
+    setState((s) => ({
+      ...s,
+      onboarded: true,
+      selectedGames: games,
+      selectedGoals: {},
+      skillLevel: null,
+      followedGames: games,
+      history: [],
+      completedTutorials: [],
+      searches: [],
+      videoSignals: {},
+    }));
+  }, []);
 
   const toggleLike = useCallback((id: string) => {
     setState((s) => {
@@ -322,6 +336,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const recordSearch = useCallback((query: string) => {
+    const normalized = query.trim();
+    if (!normalized) return;
+    setState((s) => ({
+      ...s,
+      searches: [normalized, ...s.searches.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 20),
+    }));
+  }, []);
+
+  const updateVideoSignal = useCallback(
+    (id: string, update: (signal: VideoSignal) => VideoSignal) => {
+      setState((s) => {
+        const current = s.videoSignals[id] ?? { starts: 0, completions: 0, skips: 0, rewatches: 0, shares: 0 };
+        return {
+          ...s,
+          videoSignals: { ...s.videoSignals, [id]: update(current) },
+        };
+      });
+    },
+    [],
+  );
+
+  const recordVideoStart = useCallback(
+    (id: string) => updateVideoSignal(id, (signal) => ({
+      ...signal,
+      starts: signal.starts + 1,
+      rewatches: signal.rewatches + (signal.starts > 0 ? 1 : 0),
+    })),
+    [updateVideoSignal],
+  );
+
+  const recordVideoComplete = useCallback(
+    (id: string) => updateVideoSignal(id, (signal) => ({ ...signal, completions: signal.completions + 1 })),
+    [updateVideoSignal],
+  );
+
+  const recordVideoSkip = useCallback(
+    (id: string) => updateVideoSignal(id, (signal) => ({ ...signal, skips: signal.skips + 1 })),
+    [updateVideoSignal],
+  );
+
+  const recordVideoShare = useCallback(
+    (id: string) => updateVideoSignal(id, (signal) => ({ ...signal, shares: signal.shares + 1 })),
+    [updateVideoSignal],
+  );
+
   const markAllRead = useCallback(() => {
     setState((s) => ({
       ...s,
@@ -361,6 +421,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       completeTutorial,
       completeLesson,
       addHistory,
+      recordSearch,
+      recordVideoStart,
+      recordVideoComplete,
+      recordVideoSkip,
+      recordVideoShare,
       toast,
       dismissToast,
       markAllRead,
@@ -384,6 +449,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     completeTutorial,
     completeLesson,
     addHistory,
+    recordSearch,
+    recordVideoStart,
+    recordVideoComplete,
+    recordVideoSkip,
+    recordVideoShare,
     toast,
     dismissToast,
     markAllRead,

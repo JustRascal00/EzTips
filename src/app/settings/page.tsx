@@ -8,7 +8,7 @@ import { useApp } from "@/lib/store";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
-  const { currentUser, selectedGames, skillLevel, toggleSelectedGame, logout } = useApp();
+  const { currentUser, selectedGames, toggleSelectedGame, logout } = useApp();
   const router = useRouter();
 
   return (
@@ -20,7 +20,6 @@ export default function SettingsPage() {
           <div className="text-sm text-muted">
             Signed in as {currentUser.displayName} (@{currentUser.username})
           </div>
-          <div className="text-sm text-muted">Skill preference: {skillLevel ?? "—"}</div>
           <div className="text-sm text-muted">
             Games:{" "}
             {games

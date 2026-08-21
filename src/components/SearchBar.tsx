@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { Search } from "lucide-react";
+import { useApp } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -18,13 +19,17 @@ export function SearchBar({
 }) {
   const [q, setQ] = useState(initial ?? "");
   const router = useRouter();
+  const { recordSearch } = useApp();
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         const query = q.trim();
-        if (query) router.push(`/search?q=${encodeURIComponent(query)}`);
+        if (query) {
+          recordSearch(query);
+          router.push(`/search?q=${encodeURIComponent(query)}`);
+        }
         else router.push("/search");
       }}
       className={cn("relative", className)}

@@ -7,13 +7,93 @@ import { games } from "@/data/games";
 import { tutorials } from "@/data/tutorials";
 import { cn } from "@/lib/cn";
 import { formatCount, skillLabel } from "@/lib/format";
-import { useApp } from "@/lib/store";
+import { useApp, type VideoSignal } from "@/lib/store";
 import type { Tutorial } from "@/lib/types";
-import { Heart, MessageCircle, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Plus, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type FeedTab = "foryou" | "following" | "explore";
+
+type FeedBehavior = {
+  liked: string[];
+  saved: string[];
+  completedTutorials: string[];
+  followedCreators: string[];
+  searches: string[];
+  videoSignals: Record<string, VideoSignal>;
+};
+
+function personalizedOrder(list: Tutorial[], gameOrder: string[], behavior: FeedBehavior) {
+  const topicAffinity = new Map<string, number>();
+  const gameAffinity = new Map<string, number>();
+
+  const addAffinity = (tutorial: Tutorial, weight: number) => {
+    gameAffinity.set(tutorial.gameId, (gameAffinity.get(tutorial.gameId) ?? 0) + weight);
+    [tutorial.category, tutorial.topic, ...tutorial.tags].forEach((value) => {
+      const key = value.toLowerCase();
+      topicAffinity.set(key, (topicAffinity.get(key) ?? 0) + weight);
+    });
+  };
+
+  tutorials.forEach((tutorial) => {
+    let weight = 0;
+    if (behavior.liked.includes(tutorial.id)) weight += 3;
+    if (behavior.saved.includes(tutorial.id)) weight += 5;
+    if (behavior.completedTutorials.includes(tutorial.id)) weight += 2;
+    const signal = behavior.videoSignals[tutorial.id];
+    if (signal) {
+      weight += signal.completions * 3 + signal.rewatches * 2 + signal.shares * 4 - signal.skips * 1.5;
+    }
+    if (weight) addAffinity(tutorial, weight);
+  });
+
+  const score = (tutorial: Tutorial) => {
+    const signal = behavior.videoSignals[tutorial.id];
+    const topicScore = [tutorial.category, tutorial.topic, ...tutorial.tags].reduce(
+      (total, value) => total + (topicAffinity.get(value.toLowerCase()) ?? 0),
+      0,
+    );
+    const searchable = `${tutorial.title} ${tutorial.category} ${tutorial.topic} ${tutorial.tags.join(" ")}`.toLowerCase();
+    const searchScore = behavior.searches.reduce((total, query) => {
+      const words = query.toLowerCase().split(/\s+/).filter((word) => word.length > 2);
+      return total + words.filter((word) => searchable.includes(word)).length * 1.5;
+    }, 0);
+    return (
+      Math.log10(tutorial.views + 1) * 0.25
+      + topicScore * 0.45
+      + searchScore
+      + (behavior.followedCreators.includes(tutorial.creatorId) ? 4 : 0)
+      - (signal?.completions ?? 0) * 0.5
+    );
+  };
+
+  const groups = new Map<string, Tutorial[]>();
+  gameOrder.forEach((gameId) => {
+    groups.set(gameId, list.filter((tutorial) => tutorial.gameId === gameId).sort((a, b) => score(b) - score(a)));
+  });
+
+  const cycle = gameOrder.flatMap((gameId) => {
+    const affinity = gameAffinity.get(gameId) ?? 0;
+    const slots = Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, affinity) / 8)));
+    return Array.from({ length: slots }, () => gameId);
+  });
+  const ordered: Tutorial[] = [];
+  let remaining = list.length;
+  while (remaining > 0) {
+    let added = 0;
+    cycle.forEach((gameId) => {
+      const next = groups.get(gameId)?.shift();
+      if (next) {
+        ordered.push(next);
+        remaining -= 1;
+        added += 1;
+      }
+    });
+    if (!added) break;
+  }
+  return ordered;
+}
 
 function ActionButton({
   label,
@@ -62,7 +142,7 @@ function FeedItem({
 }) {
   const game = games.find((item) => item.id === tutorial.gameId);
   const creator = creators.find((item) => item.id === tutorial.creatorId);
-  const { liked, toggleLike, toast } = useApp();
+  const { liked, toggleLike, toast, recordVideoComplete, recordVideoShare } = useApp();
   const isLiked = liked.includes(tutorial.id);
   const itemRef = useRef<HTMLElement>(null);
 
@@ -89,6 +169,7 @@ function FeedItem({
           src={tutorial.videoUrl}
           poster={tutorial.thumbnail}
           active={active}
+          onEnded={() => recordVideoComplete(tutorial.id)}
           vertical
           className="absolute inset-0 h-full w-full rounded-[24px] border border-white/10 shadow-2xl shadow-black/50"
         />
@@ -164,6 +245,7 @@ function FeedItem({
             label="Share"
             onClick={() => {
               navigator.clipboard?.writeText(`${window.location.origin}/t/${tutorial.slug}`);
+              recordVideoShare(tutorial.id);
               toast("Link copied");
             }}
           >
@@ -176,11 +258,30 @@ function FeedItem({
 }
 
 export function HomeFeed() {
-  const { selectedGames, followedCreators, addHistory } = useApp();
+  const {
+    selectedGames,
+    followedCreators,
+    liked,
+    saved,
+    completedTutorials,
+    searches,
+    videoSignals,
+    addHistory,
+    recordVideoStart,
+    recordVideoSkip,
+  } = useApp();
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const behaviorSnapshot = useRef<FeedBehavior>({
+    liked,
+    saved,
+    completedTutorials,
+    followedCreators,
+    searches,
+    videoSignals,
+  });
 
   const availableGames = useMemo(() => {
     const ids = tab === "explore" ? games.map((game) => game.id) : selectedGames;
@@ -196,6 +297,10 @@ export function HomeFeed() {
     }
     if (activeGames.length) {
       list = list.filter((tutorial) => activeGames.includes(tutorial.gameId));
+    }
+    if (tab === "foryou") {
+      const gameOrder = activeGames.length ? activeGames : selectedGames;
+      list = personalizedOrder(list, gameOrder, behaviorSnapshot.current);
     }
     return list;
   }, [activeGames, followedCreators, selectedGames, tab]);
@@ -218,8 +323,14 @@ export function HomeFeed() {
 
   useEffect(() => {
     const current = feed[activeIndex];
-    if (current) addHistory(current.id);
-  }, [activeIndex, addHistory, feed]);
+    if (!current) return;
+    const startedAt = Date.now();
+    addHistory(current.id);
+    recordVideoStart(current.id);
+    return () => {
+      if (Date.now() - startedAt < 2500) recordVideoSkip(current.id);
+    };
+  }, [activeIndex, addHistory, feed, recordVideoSkip, recordVideoStart]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -293,6 +404,13 @@ export function HomeFeed() {
               {game.name}
             </button>
           ))}
+          <Link
+            href="/games"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-dashed border-border px-3 py-1.5 text-xs font-semibold text-muted hover:border-accent/50 hover:text-white"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Game
+          </Link>
         </div>
       </header>
 
