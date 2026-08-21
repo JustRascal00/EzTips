@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { GameLogo } from "@/components/GameLogo";
 import { Progress, RankBadge } from "@/components/ui";
 import { achievements } from "@/data/notifications";
 import { games } from "@/data/games";
@@ -57,8 +58,7 @@ export default function UserProfilePage() {
               .filter((g) => selectedGames.includes(g.id) || user.ranks.some((r) => r.gameId === g.id))
               .map((g) => (
                 <div key={g.id} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={g.icon} alt="" className="h-6 w-6 rounded-md object-cover" />
+                  <GameLogo game={g} size={24} />
                   <span className="text-sm font-medium">{g.name}</span>
                 </div>
               ))}

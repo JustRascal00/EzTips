@@ -9,6 +9,7 @@ import { pathDuration } from "@/data/paths";
 import Link from "next/link";
 import { useState } from "react";
 import { RankBadge } from "./ui";
+import { GameLogo } from "./GameLogo";
 
 export function GameCard({
   game,
@@ -31,22 +32,19 @@ export function GameCard({
         large ? "h-44" : "h-36",
         onSelect && "cursor-pointer",
       )}
+      style={{ background: `linear-gradient(145deg, ${game.tint}55, #0b0d12 72%)` }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={game.banner}
         alt=""
+        onError={(event) => { event.currentTarget.style.display = "none"; }}
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
       <div className="relative h-full flex flex-col justify-end p-4">
         <div className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={game.icon}
-            alt=""
-            className="h-8 w-8 rounded-lg object-cover border border-white/10"
-          />
+          <GameLogo game={game} size={32} />
           <div>
             <div className="font-semibold leading-tight">{game.name}</div>
             <div className="text-xs text-white/70">{formatCount(game.learners)} learners</div>

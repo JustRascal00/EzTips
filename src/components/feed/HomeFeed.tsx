@@ -2,6 +2,7 @@
 
 import { FollowButton, SaveControl } from "@/components/actions";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { GameLogo } from "@/components/GameLogo";
 import { creators } from "@/data/creators";
 import { games } from "@/data/games";
 import { tutorials } from "@/data/tutorials";
@@ -181,8 +182,7 @@ function FeedItem({
               href={`/g/${game.slug}`}
               className="flex items-center gap-2 rounded-full border border-white/15 bg-black/45 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={game.icon} alt="" className="h-5 w-5 rounded-md object-cover" />
+              <GameLogo game={game} size={20} />
               {game.name}
             </Link>
           )}
@@ -399,8 +399,7 @@ export function HomeFeed() {
                   : "border-border bg-card text-muted hover:text-white",
               )}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={game.icon} alt="" className="h-4 w-4 rounded object-cover" />
+              <GameLogo game={game} size={16} />
               {game.name}
             </button>
           ))}

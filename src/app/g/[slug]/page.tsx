@@ -1,6 +1,7 @@
 "use client";
 
 import { TutorialCard } from "@/components/cards";
+import { GameLogo } from "@/components/GameLogo";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button, Tabs } from "@/components/ui";
 import { getGame } from "@/data/games";
@@ -31,8 +32,7 @@ export default function GameHubPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/45 to-black/20" />
         <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
           <div className="flex items-center gap-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={game.icon} alt="" className="h-16 w-16 rounded-2xl border border-white/20 object-cover" />
+            <GameLogo game={game} size={64} />
             <div>
               <h1 className="text-3xl font-bold">{game.name}</h1>
               <p className="text-sm text-white/65">{formatCount(game.learners)} players · {formatCount(clips.reduce((sum, clip) => sum + clip.views, 0))} clip views</p>

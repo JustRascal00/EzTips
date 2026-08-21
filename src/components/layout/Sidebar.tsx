@@ -18,6 +18,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "../Logo";
 import { Avatar } from "../ui";
+import { GameLogo } from "../GameLogo";
 
 const nav = (loggedIn: boolean) => [
   { href: loggedIn ? "/home" : "/", label: "Home", icon: Home },
@@ -215,8 +216,7 @@ export function YourGamesRail() {
             href={`/g/${g.slug}`}
             className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-hover"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={g.icon} alt="" className="h-8 w-8 rounded-lg object-cover" />
+            <GameLogo game={g} size={32} />
             <span className="text-sm font-medium truncate">{g.name}</span>
           </Link>
         ))}

@@ -23,7 +23,7 @@ export default function UploadPage() {
   const [thumb, setThumb] = useState(0);
 
   const g = games.find((x) => x.id === game);
-  const thumbs = g ? [g.banner, g.icon, g.characters[0]?.image].filter(Boolean) : [];
+  const thumbs = g ? [g.banner, g.characters[0]?.image].filter(Boolean) : [];
 
   const onDrop = (f: File) => {
     setFile(f);
