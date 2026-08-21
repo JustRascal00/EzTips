@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "EZTips — Learn your games, one clip at a time",
     description: "Community gaming tips, personalized to your games.",
-    images: [{ url: "/og.png", width: 1672, height: 941, alt: "EZTips community gaming video feed" }],
+    images: [{ url: "/og.png", width: 1672, height: 941, alt: "EZTips — Discover the trick. Level up faster." }],
   },
   twitter: {
     card: "summary_large_image",
