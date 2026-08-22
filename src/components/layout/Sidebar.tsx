@@ -42,14 +42,14 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "hidden md:flex h-screen sticky top-0 flex-col border-r border-border bg-sidebar",
-        collapsed ? "w-[72px] px-2" : "w-[232px] px-3",
+        "hidden md:flex h-screen sticky top-0 flex-col border-r border-white/[0.06] bg-[#0c0e13]",
+        collapsed ? "w-[72px] px-2" : "w-[224px] px-3",
       )}
     >
       <Link href={isLoggedIn ? "/home" : "/"} className="flex items-center h-16 px-1">
         <Logo compact={collapsed} />
       </Link>
-      <nav className="flex flex-col gap-0.5">
+      <nav className="flex flex-col gap-1 border-t border-white/[0.05] pt-4">
         {nav(isLoggedIn, currentUser.username).map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
@@ -57,22 +57,23 @@ export function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl h-10 px-3 text-sm font-medium transition-colors duration-200",
+                "group flex items-center gap-3 rounded-xl h-10 px-3 text-[13px] font-medium transition-all duration-200",
                 collapsed && "justify-center px-0",
-                active ? "bg-accent/15 text-text" : "text-muted hover:bg-hover hover:text-text",
+                active ? "bg-white/[0.07] text-text shadow-[inset_2px_0_0_#7657ff]" : "text-muted hover:bg-white/[0.04] hover:text-text",
               )}
             >
-              <Icon className={cn("h-[18px] w-[18px]", active && "text-accent")} />
+              <Icon className={cn("h-[18px] w-[18px] transition-transform duration-200 group-hover:scale-105", active && "text-accent")} />
               {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
       {!collapsed && (
-        <div className="mt-6">
+        <div className="mt-7 border-t border-white/[0.05] pt-5">
           <div className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted mb-2">
-            Creators
+            Following
           </div>
           <div className="flex flex-col gap-0.5">
             {followed.map((c) => (
@@ -88,7 +89,7 @@ export function Sidebar({
           </div>
         </div>
       )}
-      <div className="mt-auto pb-4 space-y-1">
+      <div className="mt-auto space-y-1 border-t border-white/[0.05] pb-4 pt-3">
         <button
           onClick={onOpenNotifs}
           className={cn(

@@ -18,6 +18,7 @@ export function AppShell({
   hideRight,
   fullBleed,
   publicPage,
+  hideHeader,
 }: {
   children: ReactNode;
   right?: ReactNode;
@@ -25,6 +26,7 @@ export function AppShell({
   hideRight?: boolean;
   fullBleed?: boolean;
   publicPage?: boolean;
+  hideHeader?: boolean;
 }) {
   const { hydrated, isLoggedIn } = useApp();
   const { configured } = useAuth();
@@ -59,9 +61,11 @@ export function AppShell({
     <div className="min-h-screen bg-bg flex">
       <Sidebar collapsed={collapsed} onOpenNotifs={() => setNotifs(true)} />
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex h-16 items-center gap-4 px-6 border-b border-border bg-bg/80 backdrop-blur sticky top-0 z-30">
-          <SearchBar className="max-w-xl flex-1" />
-        </header>
+        {!hideHeader && (
+          <header className="hidden md:flex h-16 items-center gap-4 px-6 border-b border-border bg-bg/80 backdrop-blur sticky top-0 z-30">
+            <SearchBar className="max-w-xl flex-1" />
+          </header>
+        )}
         <div className="flex flex-1 min-h-0">
           <main
             className={

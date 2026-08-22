@@ -51,6 +51,7 @@ body {
   .snap-feed {
     scroll-snap-type: y mandatory;
     overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
   }
 
   .snap-item {
