@@ -30,6 +30,12 @@ export type ProfileSummary = {
 
 export function videoRowToTutorial(row: VideoRow): Tutorial {
   const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
+  const tags = Array.from(new Map(
+    (row.tags ?? [])
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+      .map((tag) => [tag.toLocaleLowerCase(), tag] as const),
+  ).values());
   return {
     id: row.id,
     slug: row.slug,
@@ -40,7 +46,7 @@ export function videoRowToTutorial(row: VideoRow): Tutorial {
     category: row.category,
     topic: row.topic || row.category,
     character: row.character || undefined,
-    tags: row.tags ?? [],
+    tags,
     skillLevel: (["beginner", "intermediate", "advanced", "competitive"].includes(row.skill_level)
       ? row.skill_level
       : "intermediate") as SkillLevel,

@@ -89,10 +89,17 @@ export function StudioUploadFlow() {
     const slugBase = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "gaming-tip";
     const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
     setStage(visibility === "draft" ? "Saving draft…" : "Publishing tip…");
+    const normalizedTags = Array.from(new Map(
+      tags
+        .split(",")
+        .map((tag) => tag.trim().replace(/^#/, ""))
+        .filter(Boolean)
+        .map((tag) => [tag.toLocaleLowerCase(), tag] as const),
+    ).values()).slice(0, 12);
     const { error: insertError } = await supabase.from("videos").insert({
       user_id: user.id, slug, title: title.trim(), description: description.trim() || null, game_id: gameId,
       category: topic.trim(), topic: topic.trim(), character: metadata.character?.trim() || null,
-      tags: tags.split(",").map((tag) => tag.trim().replace(/^#/, "")).filter(Boolean).slice(0, 12),
+      tags: normalizedTags,
       skill_level: "intermediate", duration_seconds: Math.round(duration), video_path: storagePath,
       video_url: publicFile.publicUrl, thumbnail_url: thumbnails[thumb] || null,
       status: visibility === "draft" ? "draft" : "published", visibility: visibility === "draft" ? "private" : visibility,

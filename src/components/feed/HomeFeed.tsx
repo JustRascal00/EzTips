@@ -57,7 +57,7 @@ function ActionButton({ label, count, active, onClick, children }: { label: stri
   return <button type="button" aria-label={label} title={label} onClick={onClick} className={cn("group flex flex-col items-center gap-1 text-[10px] font-semibold text-white/65", active && "text-[#ff5f8f]")}><span className={cn("grid h-10 w-10 place-items-center rounded-full bg-white/[0.09] shadow-lg backdrop-blur-xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-white/15", active && "bg-[#ff5f8f]/18")}>{children}</span><span>{count === undefined ? label : formatCount(count)}</span></button>;
 }
 
-function DiscoverySearch() {
+function DiscoverySearch({ communityVideos }: { communityVideos: Tutorial[] }) {
   const router = useRouter();
   const { searches, recordSearch } = useApp();
   const [query, setQuery] = useState("");
@@ -65,7 +65,11 @@ function DiscoverySearch() {
   const inputRef = useRef<HTMLInputElement>(null);
   const normalized = query.trim().toLowerCase();
   const matchingGames = games.filter((game) => game.name.toLowerCase().includes(normalized)).slice(0, 3);
-  const matchingTips = tutorials.filter((tip) => `${tip.title} ${tip.topic} ${tip.character ?? ""} ${tip.tags.join(" ")}`.toLowerCase().includes(normalized)).slice(0, 4);
+  const searchableTutorials = useMemo(
+    () => Array.from(new Map([...communityVideos, ...tutorials].map((tip) => [tip.id, tip])).values()),
+    [communityVideos],
+  );
+  const matchingTips = searchableTutorials.filter((tip) => `${tip.title} ${tip.topic} ${tip.character ?? ""} ${tip.tags.join(" ")}`.toLowerCase().includes(normalized)).slice(0, 4);
   const matchingCreators = creators.filter((creator) => `${creator.displayName} ${creator.username} ${creator.mainFocus}`.toLowerCase().includes(normalized)).slice(0, 3);
 
   useEffect(() => {
@@ -127,6 +131,11 @@ function FeedItem({ tutorial, nextTutorial, active, onActivate, onOpenComments }
   const { liked, completedTutorials, toggleLike, toast, recordVideoComplete, recordVideoShare } = useApp();
   const isLiked = liked.includes(tutorial.id);
   const watched = completedTutorials.includes(tutorial.id);
+  const displayTags = Array.from(new Map(
+    [tutorial.character, tutorial.category, tutorial.topic, ...tutorial.tags]
+      .filter((tag): tag is string => Boolean(tag?.trim()))
+      .map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()] as const),
+  ).values()).slice(0, 3);
   const itemRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -150,7 +159,7 @@ function FeedItem({ tutorial, nextTutorial, active, onActivate, onOpenComments }
               <Link href={`/t/${tutorial.slug}`}><h2 className="max-w-[440px] text-xl font-bold leading-tight text-white sm:text-[23px]">{tutorial.title}</h2></Link>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
                 {game && <Link href={`/g/${game.slug}`} className="font-bold uppercase tracking-wide text-white">{game.short}</Link>}
-                {[tutorial.character, tutorial.category, tutorial.topic].filter(Boolean).slice(0, 3).map((tag) => <Link key={tag} href={`/search?q=${encodeURIComponent(tag!)}`} className="rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/80 backdrop-blur-sm hover:bg-white/15">{tag}</Link>)}
+                {displayTags.map((tag) => <Link key={tag.toLocaleLowerCase()} href={`/search?q=${encodeURIComponent(tag)}`} className="rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/80 backdrop-blur-sm hover:bg-white/15">{tag}</Link>)}
               </div>
               <div className="mt-2 text-[11px] text-white/45">{formatCount(tutorial.views)} views · {tutorial.duration}s</div>
             </div>
@@ -280,7 +289,7 @@ export function HomeFeed() {
         <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <select aria-label="Feed" value={tab} onChange={(event) => { setTab(event.target.value as FeedTab); resetFeed(); }} className="h-9 shrink-0 bg-transparent text-sm font-semibold outline-none md:hidden"><option value="foryou">For You</option><option value="following">Following</option><option value="explore">Explore</option></select>
           <nav className="hidden h-full shrink-0 items-center gap-6 md:flex">{([ ["foryou", "For You"], ["following", "Following"], ["explore", "Explore"] ] as const).map(([id, label]) => <button key={id} type="button" onClick={() => { setTab(id); resetFeed(); }} className={cn("relative h-full text-sm font-semibold transition-colors", tab === id ? "text-white" : "text-muted hover:text-white")}>{label}{tab === id && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent" />}</button>)}</nav>
-          <DiscoverySearch />
+          <DiscoverySearch communityVideos={communityVideos} />
         </div>
         <div className="no-scrollbar mx-auto flex h-10 max-w-[1280px] items-center gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
           <button type="button" onClick={resetFeed} className={cn("relative h-full shrink-0 px-3 text-xs font-semibold transition-colors", activeGames.length === 0 ? "text-white" : "text-muted hover:text-white")}>All{activeGames.length === 0 && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent" />}</button>

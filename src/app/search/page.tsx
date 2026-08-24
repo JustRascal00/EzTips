@@ -6,16 +6,28 @@ import { SearchBar } from "@/components/SearchBar";
 import { Chip, EmptyState, FilterSelect } from "@/components/ui";
 import { searchAll } from "@/data/index";
 import { getGame } from "@/data/games";
+import { fetchCommunityVideos } from "@/lib/supabase/videos";
+import type { Tutorial } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 function Results() {
   const params = useSearchParams();
   const q = params.get("q") ?? "";
   const [game, setGame] = useState("all");
   const [diff, setDiff] = useState("all");
-  const result = useMemo(() => searchAll(q), [q]);
+  const [communityVideos, setCommunityVideos] = useState<Tutorial[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCommunityVideos()
+      .then((videos) => { if (!cancelled) setCommunityVideos(videos); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const result = useMemo(() => searchAll(q, communityVideos), [communityVideos, q]);
   const tuts = result.tutorials.filter((t) => {
     if (game !== "all" && t.gameId !== game) return false;
     if (diff !== "all" && t.skillLevel !== diff) return false;

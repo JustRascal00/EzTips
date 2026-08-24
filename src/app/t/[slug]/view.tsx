@@ -77,8 +77,9 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           </Link>
           {" > "}
           {tutorial.category}
-          {" > "}
-          {tutorial.topic}
+          {tutorial.topic.toLocaleLowerCase() !== tutorial.category.toLocaleLowerCase() && (
+            <>{" > "}{tutorial.topic}</>
+          )}
         </div>
         <h1 className="text-3xl font-bold mt-2 tracking-tight">{tutorial.title}</h1>
         {creator && (
@@ -129,7 +130,7 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
         </div>
         <div className="flex flex-wrap gap-1.5 mt-4">
           {tutorial.tags.map((tag) => (
-            <Link key={tag} href={`/search?q=${encodeURIComponent(tag)}`}>
+            <Link key={tag.toLocaleLowerCase()} href={`/search?q=${encodeURIComponent(tag)}`}>
               <Chip>#{tag}</Chip>
             </Link>
           ))}

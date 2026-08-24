@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -33,8 +33,11 @@ export function VideoPlayer({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
+  const playerId = useId();
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
+  // Start with sound enabled. Browsers may block the initial autoplay, in which
+  // case the visible play button provides the required user gesture.
+  const [muted, setMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [volume, setVolume] = useState(1);
   const [speed, setSpeed] = useState(1);
@@ -48,15 +51,11 @@ export function VideoPlayer({
     if (!v) return;
     try {
       await v.play();
-      setPlaying(true);
-    } catch {
-      setPlaying(false);
-    }
+    } catch {}
   }, []);
 
   const pause = useCallback(() => {
     ref.current?.pause();
-    setPlaying(false);
   }, []);
 
   const toggle = useCallback(() => {
@@ -68,6 +67,33 @@ export function VideoPlayer({
     if (active === false) pause();
     else if (active) play();
   }, [active, play, pause]);
+
+  useEffect(() => {
+    const element = wrap.current;
+    const video = ref.current;
+    if (!element || !video) return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.35) video.pause();
+    }, { threshold: [0, 0.35] });
+    observer.observe(element);
+
+    const pauseForOtherPlayer = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== playerId) video.pause();
+    };
+    const pauseWhenHidden = () => {
+      if (document.hidden) video.pause();
+    };
+    window.addEventListener("eztips:video-play", pauseForOtherPlayer);
+    document.addEventListener("visibilitychange", pauseWhenHidden);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("eztips:video-play", pauseForOtherPlayer);
+      document.removeEventListener("visibilitychange", pauseWhenHidden);
+      video.pause();
+    };
+  }, [playerId]);
 
   useEffect(() => {
     if (active === false) return;
@@ -95,7 +121,10 @@ export function VideoPlayer({
     const onTime = () => {
       if (v.duration) setProgress(v.currentTime / v.duration);
     };
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      setPlaying(true);
+      window.dispatchEvent(new CustomEvent("eztips:video-play", { detail: playerId }));
+    };
     const onPause = () => setPlaying(false);
     v.addEventListener("timeupdate", onTime);
     v.addEventListener("play", onPlay);
@@ -106,7 +135,7 @@ export function VideoPlayer({
       v.removeEventListener("play", onPlay);
       v.removeEventListener("pause", onPause);
     };
-  }, [onEnded]);
+  }, [onEnded, playerId]);
 
   const bumpUi = () => {
     setShowUi((open) => (open ? open : true));

@@ -3,6 +3,7 @@ import { creators, getCreator } from "./creators";
 import { games, getGame } from "./games";
 import { getPath, learningPaths } from "./paths";
 import { getTutorial, tutorials } from "./tutorials";
+import type { Tutorial } from "@/lib/types";
 
 export {
   commentsFor,
@@ -16,8 +17,11 @@ export {
   tutorials,
 };
 
-export function searchAll(query: string) {
+export function searchAll(query: string, additionalTutorials: Tutorial[] = []) {
   const q = query.trim().toLowerCase();
+  const searchableTutorials = Array.from(
+    new Map([...additionalTutorials, ...tutorials].map((tutorial) => [tutorial.id, tutorial])).values(),
+  );
   if (!q) {
     return {
       tutorials: [],
@@ -29,7 +33,7 @@ export function searchAll(query: string) {
     };
   }
 
-  const tuts = tutorials.filter((t) => {
+  const tuts = searchableTutorials.filter((t) => {
     const blob = [
       t.title,
       t.learn,
@@ -77,7 +81,7 @@ export function searchAll(query: string) {
   });
 
   const topicSet = new Set<string>();
-  tutorials.forEach((t) => {
+  searchableTutorials.forEach((t) => {
     if (t.topic.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)) {
       topicSet.add(t.topic);
     }
