@@ -4,7 +4,7 @@ import { GameLogo } from "@/components/GameLogo";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui";
 import { games } from "@/data/games";
-import { tutorials } from "@/data/tutorials";
+import { championSplashUrl } from "@/lib/ddragon/shared";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -227,7 +227,8 @@ export function AuthForm() {
 }
 
 function AuthShowcase() {
-  const clip = tutorials[0];
+  // Decorative preview (not real data).
+  const clip = { title: "Punish Zed the moment his shadow is down", thumbnail: championSplashUrl("Ahri"), gameId: "lol" };
   const game = games.find((item) => item.id === clip.gameId) ?? games[0];
   return (
     <aside className="relative hidden min-h-dvh overflow-hidden border-r border-white/[0.06] bg-[#090a0f] p-10 lg:flex lg:flex-col xl:p-14">

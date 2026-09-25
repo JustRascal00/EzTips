@@ -3,8 +3,10 @@
 import { TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button, EmptyState, Tabs } from "@/components/ui";
-import { tutorials } from "@/data/tutorials";
 import { useApp } from "@/lib/store";
+import { getTipsByIds } from "@/lib/tips";
+import type { Tutorial } from "@/lib/types";
+import { useSupabaseQuery } from "@/lib/use-tips";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -12,8 +14,10 @@ export default function LibraryPage() {
   const { saved, liked, history } = useApp();
   const [tab, setTab] = useState("saved");
 
-  const byIds = (ids: string[]) =>
-    ids.map((id) => tutorials.find((t) => t.id === id)).filter(Boolean);
+  const ids = [...saved, ...liked, ...history];
+  const { data: found } = useSupabaseQuery(`library:${ids.join(",")}`, (client) => getTipsByIds(client, ids), [] as Tutorial[]);
+  const byId = new Map(found.map((tip) => [tip.id, tip]));
+  const byIds = (list: string[]) => list.map((id) => byId.get(id)).filter(Boolean);
 
   const savedList = byIds(saved);
   const likedList = byIds(liked);

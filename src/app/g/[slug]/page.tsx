@@ -5,8 +5,11 @@ import { GameLogo } from "@/components/GameLogo";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button, Tabs } from "@/components/ui";
 import { getGame } from "@/data/games";
-import { tutorialsByGame } from "@/data/tutorials";
+import { championIconUrl } from "@/lib/ddragon/shared";
 import { formatCount } from "@/lib/format";
+import { listTips } from "@/lib/tips";
+import type { Tutorial } from "@/lib/types";
+import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
 import { useApp } from "@/lib/store";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
@@ -17,10 +20,12 @@ export default function GameHubPage() {
   const game = getGame(slug);
   const { selectedGames, toggleSelectedGame } = useApp();
   const [tab, setTab] = useState("videos");
+  const { data: clips } = useSupabaseQuery(`game:${slug}`, (client) => listTips(client, { sort: "top", limit: 60 }), [] as Tutorial[]);
+  const { data: champions } = useChampions();
+  const { ddragonVersion } = useCurrentPatch();
 
   if (!game) return notFound();
 
-  const clips = tutorialsByGame(game.id);
   const inFeed = selectedGames.includes(game.id);
   const categories = [...new Set(clips.map((clip) => clip.category))];
 
@@ -49,7 +54,7 @@ export default function GameHubPage() {
           tabs={[
             { id: "videos", label: "Videos" },
             { id: "topics", label: "Topics" },
-            { id: "characters", label: game.id === "valorant" ? "Agents" : "Characters" },
+            { id: "characters", label: "Champions" },
           ]}
           value={tab}
           onChange={setTab}
@@ -87,14 +92,14 @@ export default function GameHubPage() {
 
         {tab === "characters" && (
           <div className="py-8">
-            {game.characters.length ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-5">
-                {game.characters.map((character) => (
-                  <Link key={character.id} href={`/search?q=${encodeURIComponent(character.name)}`} className="text-center">
+            {champions.length ? (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8">
+                {champions.map((champion) => (
+                  <Link key={champion.id} href={`/search?q=${encodeURIComponent(champion.name)}`} className="text-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={character.image} alt="" className="h-32 w-full rounded-2xl border border-border object-cover" />
-                    <div className="mt-2 font-medium">{character.name}</div>
-                    <div className="text-xs text-muted">{character.role}</div>
+                    <img src={championIconUrl(ddragonVersion, champion.id)} alt="" loading="lazy" className="aspect-square w-full rounded-2xl border border-border object-cover" />
+                    <div className="mt-1.5 truncate text-sm font-medium">{champion.name}</div>
+                    <div className="truncate text-[11px] text-muted">{champion.tags.join(" · ")}</div>
                   </Link>
                 ))}
               </div>

@@ -1,5 +1,5 @@
 -- EZTips backend: authentication profiles, game preferences, videos, and social records.
--- Run this file once in the Supabase SQL editor for a new project.
+-- Run this file in the Supabase SQL editor for a new project. Safe to re-run.
 
 create extension if not exists pgcrypto;
 
@@ -114,39 +114,61 @@ alter table public.video_likes enable row level security;
 alter table public.video_saves enable row level security;
 alter table public.creator_follows enable row level security;
 
+drop policy if exists "Profiles are public" on public.profiles;
 create policy "Profiles are public" on public.profiles for select to anon, authenticated using (true);
+drop policy if exists "Users update their profile" on public.profiles;
 create policy "Users update their profile" on public.profiles for update to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
+drop policy if exists "Users view their games" on public.user_games;
 create policy "Users view their games" on public.user_games for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "Users add their games" on public.user_games;
 create policy "Users add their games" on public.user_games for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "Users remove their games" on public.user_games;
 create policy "Users remove their games" on public.user_games for delete to authenticated using ((select auth.uid()) = user_id);
 
+drop policy if exists "Published videos are public" on public.videos;
 create policy "Published videos are public" on public.videos for select to anon, authenticated using (status = 'published' or (select auth.uid()) = user_id);
+drop policy if exists "Creators publish videos" on public.videos;
 create policy "Creators publish videos" on public.videos for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "Creators update videos" on public.videos;
 create policy "Creators update videos" on public.videos for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists "Creators delete videos" on public.videos;
 create policy "Creators delete videos" on public.videos for delete to authenticated using ((select auth.uid()) = user_id);
 
+drop policy if exists "Likes are public" on public.video_likes;
 create policy "Likes are public" on public.video_likes for select to anon, authenticated using (true);
+drop policy if exists "Users add likes" on public.video_likes;
 create policy "Users add likes" on public.video_likes for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "Users remove likes" on public.video_likes;
 create policy "Users remove likes" on public.video_likes for delete to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "Users view saves" on public.video_saves;
 create policy "Users view saves" on public.video_saves for select to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "Users add saves" on public.video_saves;
 create policy "Users add saves" on public.video_saves for insert to authenticated with check ((select auth.uid()) = user_id);
+drop policy if exists "Users remove saves" on public.video_saves;
 create policy "Users remove saves" on public.video_saves for delete to authenticated using ((select auth.uid()) = user_id);
+drop policy if exists "Follows are public" on public.creator_follows;
 create policy "Follows are public" on public.creator_follows for select to anon, authenticated using (true);
+drop policy if exists "Users follow creators" on public.creator_follows;
 create policy "Users follow creators" on public.creator_follows for insert to authenticated with check ((select auth.uid()) = follower_id);
+drop policy if exists "Users unfollow creators" on public.creator_follows;
 create policy "Users unfollow creators" on public.creator_follows for delete to authenticated using ((select auth.uid()) = follower_id);
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('videos', 'videos', true, 52428800, array['video/mp4', 'video/webm', 'video/quicktime'])
 on conflict (id) do update set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "Video files are public" on storage.objects;
 create policy "Video files are public" on storage.objects for select to anon, authenticated using (bucket_id = 'videos');
+drop policy if exists "Users upload their videos" on storage.objects;
 create policy "Users upload their videos" on storage.objects for insert to authenticated with check (
   bucket_id = 'videos' and (storage.foldername(name))[1] = (select auth.uid())::text
 );
+drop policy if exists "Users update their video files" on storage.objects;
 create policy "Users update their video files" on storage.objects for update to authenticated using (
   bucket_id = 'videos' and owner_id = (select auth.uid())::text
 );
+drop policy if exists "Users delete their video files" on storage.objects;
 create policy "Users delete their video files" on storage.objects for delete to authenticated using (
   bucket_id = 'videos' and owner_id = (select auth.uid())::text
 );

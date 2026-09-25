@@ -4,14 +4,14 @@ import { FollowButton, SaveControl } from "@/components/actions";
 import { CommentThread } from "@/components/Comments";
 import { GameLogo } from "@/components/GameLogo";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { creators } from "@/data/creators";
 import { games } from "@/data/games";
-import { tutorials } from "@/data/tutorials";
 import { cn } from "@/lib/cn";
+import { championIconUrl } from "@/lib/ddragon/shared";
 import { formatCount } from "@/lib/format";
 import { useApp, type VideoSignal } from "@/lib/store";
-import { fetchCommunityVideos } from "@/lib/supabase/videos";
+import { listTips, searchCreators, searchTips, type CreatorSummary } from "@/lib/tips";
 import type { Tutorial } from "@/lib/types";
+import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
 import { ArrowDown, CheckCircle2, Clock3, Heart, MessageCircle, MoreHorizontal, Plus, Search, Share2, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,20 +57,28 @@ function ActionButton({ label, count, active, onClick, children }: { label: stri
   return <button type="button" aria-label={label} title={label} onClick={onClick} className={cn("group flex flex-col items-center gap-1 text-[10px] font-semibold text-white/65", active && "text-[#ff5f8f]")}><span className={cn("grid h-10 w-10 place-items-center rounded-full bg-white/[0.09] shadow-lg backdrop-blur-xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-white/15", active && "bg-[#ff5f8f]/18")}>{children}</span><span>{count === undefined ? label : formatCount(count)}</span></button>;
 }
 
-function DiscoverySearch({ communityVideos }: { communityVideos: Tutorial[] }) {
+function useDebounced<T>(value: T, ms: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => { const timer = window.setTimeout(() => setDebounced(value), ms); return () => window.clearTimeout(timer); }, [value, ms]);
+  return debounced;
+}
+
+function DiscoverySearch() {
   const router = useRouter();
   const { searches, recordSearch } = useApp();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const normalized = query.trim().toLowerCase();
-  const matchingGames = games.filter((game) => game.name.toLowerCase().includes(normalized)).slice(0, 3);
-  const searchableTutorials = useMemo(
-    () => Array.from(new Map([...communityVideos, ...tutorials].map((tip) => [tip.id, tip])).values()),
-    [communityVideos],
-  );
-  const matchingTips = searchableTutorials.filter((tip) => `${tip.title} ${tip.topic} ${tip.character ?? ""} ${tip.tags.join(" ")}`.toLowerCase().includes(normalized)).slice(0, 4);
-  const matchingCreators = creators.filter((creator) => `${creator.displayName} ${creator.username} ${creator.mainFocus}`.toLowerCase().includes(normalized)).slice(0, 3);
+  const debounced = useDebounced(normalized, 250);
+  const { data: champions } = useChampions();
+  const { ddragonVersion } = useCurrentPatch();
+  const compact = normalized.replace(/[^a-z0-9]/g, "");
+  const matchingChampions = compact.length >= 2 ? champions.filter((c) => c.name.toLowerCase().replace(/[^a-z0-9]/g, "").includes(compact)).slice(0, 3) : [];
+  const { data: tipResults } = useSupabaseQuery(`dropdown-tips:${debounced}`, (client) => (debounced.length >= 2 ? searchTips(client, debounced, { limit: 4 }) : Promise.resolve([])), [] as Tutorial[]);
+  const { data: creatorResults } = useSupabaseQuery(`dropdown-creators:${debounced}`, (client) => searchCreators(client, debounced, 3), [] as CreatorSummary[]);
+  const matchingTips = debounced === normalized ? tipResults : [];
+  const matchingCreators = debounced === normalized ? creatorResults : [];
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -103,18 +111,18 @@ function DiscoverySearch({ communityVideos }: { communityVideos: Tutorial[] }) {
             {!normalized ? (
               <div className="p-3">
                 <div className="px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Quick discovery</div>
-                <div className="flex flex-wrap gap-2 px-2 pb-3">{["Ahri combos", "Mirage smokes", "Minecraft traps", "Jungle routes"].map((term) => <button key={term} onClick={() => submit(term)} className="rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-xs text-white/75 hover:bg-white/[0.08]">{term}</button>)}</div>
+                <div className="flex flex-wrap gap-2 px-2 pb-3">{["Ahri combo", "Wave management", "Jungle tempo", "How to punish Zed"].map((term) => <button key={term} onClick={() => submit(term)} className="rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-xs text-white/75 hover:bg-white/[0.08]">{term}</button>)}</div>
                 {searches.length > 0 && <><div className="border-t border-white/[0.06] px-2 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Recent</div>{searches.slice(-3).reverse().map((term) => <button key={term} onClick={() => submit(term)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-white/[0.05]"><Clock3 className="h-4 w-4 text-muted" />{term}</button>)}</>}
               </div>
             ) : (
               <div className="p-2">
-                {matchingGames.length > 0 && <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Games</div>}
-                {matchingGames.map((game) => <Link key={game.id} href={`/g/${game.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><GameLogo game={game} size={28} /><div className="text-sm font-semibold">{game.name}</div></Link>)}
+                {matchingChampions.length > 0 && <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Champions</div>}
+                {matchingChampions.map((champion) => <button key={champion.id} type="button" onClick={() => submit(champion.name)} className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:bg-white/[0.05]"><img src={championIconUrl(ddragonVersion, champion.id)} alt="" className="h-8 w-8 rounded-lg" /><div className="text-sm font-semibold">{champion.name}</div><div className="truncate text-xs text-muted">{champion.title}</div></button>)}
                 {matchingTips.length > 0 && <div className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Topics & tips</div>}
-                {matchingTips.map((tip) => <Link key={tip.id} href={`/t/${tip.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={tip.thumbnail} alt="" className="h-10 w-14 rounded-lg object-cover" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{tip.title}</div><div className="text-xs text-muted">{tip.topic} · {games.find((game) => game.id === tip.gameId)?.name}</div></div></Link>)}
+                {matchingTips.map((tip) => <Link key={tip.id} href={`/t/${tip.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={tip.thumbnail} alt="" className="h-10 w-14 rounded-lg object-cover" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{tip.title}</div><div className="text-xs text-muted">{[tip.championName, tip.topic, tip.patch ? `Patch ${tip.patch}` : null].filter(Boolean).join(" · ")}</div></div></Link>)}
                 {matchingCreators.length > 0 && <div className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Creators</div>}
-                {matchingCreators.map((creator) => <Link key={creator.id} href={`/c/${creator.username}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={creator.avatar} alt="" className="h-8 w-8 rounded-full object-cover" /><div><div className="text-sm font-semibold">{creator.displayName}</div><div className="text-xs text-muted">@{creator.username}</div></div></Link>)}
-                {!matchingGames.length && !matchingTips.length && !matchingCreators.length && <button onClick={() => submit()} className="flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm hover:bg-white/[0.05]"><Search className="h-4 w-4 text-accent" />Search all of EZTips for “{query}”</button>}
+                {matchingCreators.map((creator) => <Link key={creator.id} href={`/u/${creator.username}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={creator.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(creator.username)}`} alt="" className="h-8 w-8 rounded-full object-cover" /><div><div className="text-sm font-semibold">{creator.display_name}</div><div className="text-xs text-muted">@{creator.username}</div></div></Link>)}
+                {!matchingChampions.length && !matchingTips.length && !matchingCreators.length && <button onClick={() => submit()} className="flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm hover:bg-white/[0.05]"><Search className="h-4 w-4 text-accent" />Search all of EZTips for “{query}”</button>}
               </div>
             )}
           </div>
@@ -124,15 +132,21 @@ function DiscoverySearch({ communityVideos }: { communityVideos: Tutorial[] }) {
   );
 }
 
-function FeedItem({ tutorial, nextTutorial, active, onActivate, onOpenComments }: { tutorial: Tutorial; nextTutorial?: Tutorial; active: boolean; onActivate: () => void; onOpenComments: () => void }) {
+type FeedCreator = { id: string; username: string; displayName: string; avatar: string };
+
+function creatorOf(tutorial: Tutorial): FeedCreator | undefined {
+  if (!tutorial.creatorUsername) return undefined;
+  return { id: tutorial.creatorId, username: tutorial.creatorUsername, displayName: tutorial.creatorDisplayName || tutorial.creatorUsername, avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}` };
+}
+
+function FeedItem({ tutorial, nextTutorial, trending, suggestedCreators, active, onActivate, onOpenComments }: { tutorial: Tutorial; nextTutorial?: Tutorial; trending: Tutorial[]; suggestedCreators: FeedCreator[]; active: boolean; onActivate: () => void; onOpenComments: () => void }) {
   const game = games.find((item) => item.id === tutorial.gameId);
-  const staticCreator = creators.find((item) => item.id === tutorial.creatorId);
-  const creator = staticCreator ?? (tutorial.creatorUsername ? { id: tutorial.creatorId, username: tutorial.creatorUsername, displayName: tutorial.creatorDisplayName || tutorial.creatorUsername, avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}`, mainFocus: "Community creator" } : undefined);
+  const creator = creatorOf(tutorial);
   const { liked, completedTutorials, toggleLike, toast, recordVideoComplete, recordVideoShare } = useApp();
   const isLiked = liked.includes(tutorial.id);
   const watched = completedTutorials.includes(tutorial.id);
   const displayTags = Array.from(new Map(
-    [tutorial.character, tutorial.category, tutorial.topic, ...tutorial.tags]
+    [tutorial.championName ?? tutorial.character, tutorial.topic, ...tutorial.tags]
       .filter((tag): tag is string => Boolean(tag?.trim()))
       .map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()] as const),
   ).values()).slice(0, 3);
@@ -155,10 +169,10 @@ function FeedItem({ tutorial, nextTutorial, active, onActivate, onOpenComments }
             <VideoPlayer src={tutorial.videoUrl} poster={tutorial.thumbnail} active={active} onEnded={() => recordVideoComplete(tutorial.id)} vertical className="absolute inset-0 h-full w-full rounded-[30px]" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black via-black/65 to-transparent" />
             <div className="absolute inset-x-5 bottom-5 z-20 pr-2 sm:inset-x-6 sm:bottom-6">
-              {creator && <div className="mb-3 flex items-center gap-2.5"><Link href={staticCreator ? `/c/${creator.username}` : `/u/${creator.username}`} className="flex min-w-0 items-center gap-2.5"><img src={creator.avatar} alt={creator.displayName} className="h-9 w-9 rounded-full border border-white/20 object-cover" /><span className="truncate text-sm font-semibold text-white">@{creator.username}</span></Link><FollowButton creatorId={tutorial.creatorId} size="sm" />{watched && <span className="ml-auto flex items-center gap-1 text-[10px] text-white/60"><CheckCircle2 className="h-3.5 w-3.5 text-success" />Watched</span>}</div>}
+              {creator && <div className="mb-3 flex items-center gap-2.5"><Link href={`/u/${creator.username}`} className="flex min-w-0 items-center gap-2.5"><img src={creator.avatar} alt={creator.displayName} className="h-9 w-9 rounded-full border border-white/20 object-cover" /><span className="truncate text-sm font-semibold text-white">@{creator.username}</span></Link><FollowButton creatorId={tutorial.creatorId} size="sm" />{watched && <span className="ml-auto flex items-center gap-1 text-[10px] text-white/60"><CheckCircle2 className="h-3.5 w-3.5 text-success" />Watched</span>}</div>}
               <Link href={`/t/${tutorial.slug}`}><h2 className="max-w-[440px] text-xl font-bold leading-tight text-white sm:text-[23px]">{tutorial.title}</h2></Link>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
-                {game && <Link href={`/g/${game.slug}`} className="font-bold uppercase tracking-wide text-white">{game.short}</Link>}
+                {tutorial.patch && <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-bold", tutorial.patchIsCurrent ? "bg-accent/80 text-white" : "bg-amber-400/20 text-amber-200")}>{tutorial.patch}</span>}
                 {displayTags.map((tag) => <Link key={tag.toLocaleLowerCase()} href={`/search?q=${encodeURIComponent(tag)}`} className="rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/80 backdrop-blur-sm hover:bg-white/15">{tag}</Link>)}
               </div>
               <div className="mt-2 text-[11px] text-white/45">{formatCount(tutorial.views)} views · {tutorial.duration}s</div>
@@ -176,12 +190,12 @@ function FeedItem({ tutorial, nextTutorial, active, onActivate, onOpenComments }
         <aside className="hidden self-stretch py-8 2xl:flex 2xl:flex-col">
           <section>
             <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold">Trending today</h3><Link href="/explore" className="text-xs text-muted hover:text-white">See all</Link></div>
-            <div className="space-y-4">{[nextTutorial, ...tutorials.filter((tip) => tip.id !== tutorial.id && tip.id !== nextTutorial?.id).slice(0, 2)].filter(Boolean).map((tip, position) => <Link key={tip!.id} href={`/t/${tip!.slug}`} className="group flex items-center gap-3"><div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-card"><img src={tip!.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" /><span className="absolute bottom-1 right-1 rounded bg-black/65 px-1 text-[9px] text-white">{tip!.duration}s</span></div><div className="min-w-0"><div className="line-clamp-2 text-sm font-medium leading-snug text-white/85 group-hover:text-white">{tip!.title}</div><div className="mt-1 text-[11px] text-muted">{games.find((item) => item.id === tip!.gameId)?.short} · #{position + 1} trending</div></div></Link>)}</div>
+            <div className="space-y-4">{[nextTutorial, ...trending.filter((tip) => tip.id !== tutorial.id && tip.id !== nextTutorial?.id).slice(0, 2)].filter(Boolean).map((tip, position) => <Link key={tip!.id} href={`/t/${tip!.slug}`} className="group flex items-center gap-3"><div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-card"><img src={tip!.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" /><span className="absolute bottom-1 right-1 rounded bg-black/65 px-1 text-[9px] text-white">{tip!.duration}s</span></div><div className="min-w-0"><div className="line-clamp-2 text-sm font-medium leading-snug text-white/85 group-hover:text-white">{tip!.title}</div><div className="mt-1 text-[11px] text-muted">{tip!.championName ?? tip!.topic} · #{position + 1} trending</div></div></Link>)}</div>
           </section>
-          <section className="mt-9 border-t border-white/[0.06] pt-7">
+          {suggestedCreators.length > 0 && <section className="mt-9 border-t border-white/[0.06] pt-7">
             <h3 className="mb-4 text-sm font-semibold">Creators for you</h3>
-            <div className="space-y-4">{creators.slice(0, 3).map((item) => <div key={item.id} className="flex items-center gap-3"><img src={item.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /><Link href={`/c/${item.username}`} className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{item.displayName}</div><div className="truncate text-[11px] text-muted">@{item.username}</div></Link><FollowButton creatorId={item.id} size="sm" /></div>)}</div>
-          </section>
+            <div className="space-y-4">{suggestedCreators.slice(0, 3).map((item) => <div key={item.id} className="flex items-center gap-3"><img src={item.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /><Link href={`/u/${item.username}`} className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{item.displayName}</div><div className="truncate text-[11px] text-muted">@{item.username}</div></Link><FollowButton creatorId={item.id} size="sm" /></div>)}</div>
+          </section>}
           <div className="mt-auto flex items-center gap-2 text-[10px] text-muted"><ArrowDown className="h-3.5 w-3.5" />J / K to move through tips</div>
         </aside>
       </div>
@@ -194,7 +208,7 @@ export function HomeFeed() {
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [communityVideos, setCommunityVideos] = useState<Tutorial[]>([]);
+  const { data: communityVideos } = useSupabaseQuery("home-feed", (client) => listTips(client, { limit: 100 }), [] as Tutorial[]);
   const [commentsVideo, setCommentsVideo] = useState<Tutorial | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const activeIndexRef = useRef(0);
@@ -202,10 +216,9 @@ export function HomeFeed() {
   const wheelDeltaRef = useRef(0);
   const behavior = useMemo<FeedBehavior>(() => ({ liked, saved, completedTutorials, followedCreators, searches, videoSignals }), [completedTutorials, followedCreators, liked, saved, searches, videoSignals]);
 
-  useEffect(() => { let cancelled = false; fetchCommunityVideos().then((items) => { if (!cancelled) setCommunityVideos(items); }).catch(() => {}); return () => { cancelled = true; }; }, []);
   const availableGames = useMemo(() => games.filter((game) => (tab === "explore" ? games.map((item) => item.id) : selectedGames).includes(game.id)), [selectedGames, tab]);
   const feed = useMemo(() => {
-    let list = [...communityVideos, ...tutorials];
+    let list = [...communityVideos];
     if (tab === "following") list = list.filter((tutorial) => followedCreators.includes(tutorial.creatorId));
     else if (tab === "foryou" && selectedGames.length) list = list.filter((tutorial) => selectedGames.includes(tutorial.gameId));
     if (activeGames.length) list = list.filter((tutorial) => activeGames.includes(tutorial.gameId));
@@ -281,6 +294,12 @@ export function HomeFeed() {
   }, [activeIndex, commentsVideo, feed, toggleFollowCreator, toggleLike, toggleSave]);
 
   const ambientGame = games.find((game) => game.id === feed[activeIndex]?.gameId);
+  const trending = useMemo(() => [...communityVideos].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || b.views - a.views).slice(0, 6), [communityVideos]);
+  const suggestedCreators = useMemo(() => {
+    const seen = new Map<string, FeedCreator>();
+    for (const tip of trending) { const c = creatorOf(tip); if (c && !followedCreators.includes(c.id) && !seen.has(c.id)) seen.set(c.id, c); }
+    return [...seen.values()];
+  }, [followedCreators, trending]);
 
   return (
     <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#07080b] pb-16 md:pb-0">
@@ -289,7 +308,7 @@ export function HomeFeed() {
         <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <select aria-label="Feed" value={tab} onChange={(event) => { setTab(event.target.value as FeedTab); resetFeed(); }} className="h-9 shrink-0 bg-transparent text-sm font-semibold outline-none md:hidden"><option value="foryou">For You</option><option value="following">Following</option><option value="explore">Explore</option></select>
           <nav className="hidden h-full shrink-0 items-center gap-6 md:flex">{([ ["foryou", "For You"], ["following", "Following"], ["explore", "Explore"] ] as const).map(([id, label]) => <button key={id} type="button" onClick={() => { setTab(id); resetFeed(); }} className={cn("relative h-full text-sm font-semibold transition-colors", tab === id ? "text-white" : "text-muted hover:text-white")}>{label}{tab === id && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent" />}</button>)}</nav>
-          <DiscoverySearch communityVideos={communityVideos} />
+          <DiscoverySearch />
         </div>
         <div className="no-scrollbar mx-auto flex h-10 max-w-[1280px] items-center gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
           <button type="button" onClick={resetFeed} className={cn("relative h-full shrink-0 px-3 text-xs font-semibold transition-colors", activeGames.length === 0 ? "text-white" : "text-muted hover:text-white")}>All{activeGames.length === 0 && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent" />}</button>
@@ -298,7 +317,7 @@ export function HomeFeed() {
         </div>
       </header>
       <div ref={scrollerRef} className={cn("snap-feed no-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto transition-transform duration-200", commentsVideo && "2xl:-translate-x-24")}>
-        {feed.length ? feed.map((tutorial, index) => <FeedItem key={tutorial.id} tutorial={tutorial} nextTutorial={feed[index + 1] ?? feed[0]} active={activeIndex === index} onActivate={() => setActiveIndex(index)} onOpenComments={() => setCommentsVideo(tutorial)} />) : <div className="grid h-full place-items-center px-6 text-center"><div className="rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-8"><Sparkles className="mx-auto h-7 w-7 text-accent" /><h2 className="mt-4 text-xl font-bold">Nothing in this lane yet</h2><p className="mt-2 text-sm text-muted">Switch games or open the wider discovery feed.</p><button type="button" onClick={() => { setTab("explore"); resetFeed(); }} className="mt-5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white">Open Discover</button></div></div>}
+        {feed.length ? feed.map((tutorial, index) => <FeedItem key={tutorial.id} tutorial={tutorial} nextTutorial={feed[index + 1] ?? feed[0]} trending={trending} suggestedCreators={suggestedCreators} active={activeIndex === index} onActivate={() => setActiveIndex(index)} onOpenComments={() => setCommentsVideo(tutorial)} />) : <div className="grid h-full place-items-center px-6 text-center"><div className="rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-8"><Sparkles className="mx-auto h-7 w-7 text-accent" /><h2 className="mt-4 text-xl font-bold">Nothing in this lane yet</h2><p className="mt-2 text-sm text-muted">Switch games or open the wider discovery feed.</p><button type="button" onClick={() => { setTab("explore"); resetFeed(); }} className="mt-5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white">Open Discover</button></div></div>}
       </div>
       <div className={cn("fixed inset-0 z-[70] transition", commentsVideo ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!commentsVideo}>
         <button aria-label="Close comments" onClick={() => setCommentsVideo(null)} className={cn("absolute inset-0 bg-black/35 transition-opacity duration-200", commentsVideo ? "opacity-100" : "opacity-0")} />

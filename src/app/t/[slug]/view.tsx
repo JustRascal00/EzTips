@@ -6,11 +6,10 @@ import { TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
 import { RightRail, RailSection } from "@/components/layout/Sidebar";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { Chip, RankBadge, VerifiedMark } from "@/components/ui";
-import { getCreator } from "@/data/creators";
-import { getGame } from "@/data/games";
-import { tutorials } from "@/data/tutorials";
+import { Chip, RankBadge } from "@/components/ui";
 import { formatDuration, formatCount, skillLabel } from "@/lib/format";
+import { listTips } from "@/lib/tips";
+import { useSupabaseQuery } from "@/lib/use-tips";
 import { useApp } from "@/lib/store";
 import { Heart, Share2 } from "lucide-react";
 import Link from "next/link";
@@ -25,23 +24,22 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
     addHistory(tutorialId);
   }, [tutorialId, addHistory]);
 
-  const game = getGame(tutorial.gameId);
-  const staticCreator = getCreator(tutorial.creatorId);
-  const creator = staticCreator ?? (tutorial.creatorUsername ? {
+  const creator = tutorial.creatorUsername ? {
     id: tutorial.creatorId,
     username: tutorial.creatorUsername,
     displayName: tutorial.creatorDisplayName || tutorial.creatorUsername,
     avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}`,
-    verified: false,
-    credential: { label: "Community creator" },
-  } : undefined);
-  const related = tutorials
-    .filter(
-      (t) =>
-        t.id !== tutorial.id &&
-        (t.gameId === tutorial.gameId || t.category === tutorial.category),
-    )
-    .slice(0, 6);
+  } : undefined;
+  // Related: same champion first, otherwise same role.
+  const relatedKey = `related:${tutorial.id}:${tutorial.championId ?? ""}:${tutorial.roleId ?? ""}`;
+  const { data: related } = useSupabaseQuery(relatedKey, async (client) => {
+    const byChampion = tutorial.championId ? await listTips(client, { championId: tutorial.championId, excludeId: tutorial.id, sort: "top", limit: 6 }) : [];
+    if (byChampion.length >= 4 || !tutorial.roleId) return byChampion;
+    const byRole = await listTips(client, { roleId: tutorial.roleId, excludeId: tutorial.id, sort: "top", limit: 6 });
+    return [...byChampion, ...byRole.filter((t) => !byChampion.some((b) => b.id === t.id))].slice(0, 6);
+  }, [] as Tutorial[]);
+  const roleLabel = tutorial.roleId ? ({ top: "Top", jungle: "Jungle", mid: "Mid", adc: "ADC", support: "Support" } as Record<string, string>)[tutorial.roleId] : null;
+  const mapLabel = tutorial.mapId ? ({ sr: "Summoner's Rift", aram: "ARAM", arena: "Arena" } as Record<string, string>)[tutorial.mapId] : null;
   const likeOn = liked.includes(tutorial.id);
 
   return (
@@ -71,28 +69,29 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
             className="h-full w-full"
           />
         </div>
-        <div className="text-sm text-muted mt-5">
-          <Link href={`/g/${game?.slug}`} className="hover:text-text">
-            {game?.name}
-          </Link>
-          {" > "}
-          {tutorial.category}
-          {tutorial.topic.toLocaleLowerCase() !== tutorial.category.toLocaleLowerCase() && (
-            <>{" > "}{tutorial.topic}</>
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted">
+          {tutorial.championName && (
+            <Link href={`/search?q=${encodeURIComponent(tutorial.championName)}`} className="font-semibold text-text hover:text-accent">{tutorial.championName}</Link>
           )}
+          {roleLabel && <span>· {roleLabel}</span>}
+          {mapLabel && <span>· {mapLabel}</span>}
+          <span>· {tutorial.topic}</span>
+          <span
+            className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${tutorial.patch ? (tutorial.patchIsCurrent ? "bg-accent/15 text-accent" : "bg-amber-400/10 text-amber-300") : "bg-card text-muted"}`}
+            title={tutorial.patch && !tutorial.patchIsCurrent ? "Made on an older patch. It may be outdated." : undefined}
+          >
+            {tutorial.patch ? `Patch ${tutorial.patch}` : "Patch unknown"}
+          </span>
         </div>
         <h1 className="text-3xl font-bold mt-2 tracking-tight">{tutorial.title}</h1>
         {creator && (
           <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
-            <Link href={staticCreator ? `/c/${creator.username}` : `/u/${creator.username}`} className="flex items-center gap-3">
+            <Link href={`/u/${creator.username}`} className="flex items-center gap-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={creator.avatar} alt="" className="h-11 w-11 rounded-full border border-border" />
               <div>
-                <div className="flex items-center gap-1 font-semibold">
-                  @{creator.username}
-                  {creator.verified && <VerifiedMark />}
-                </div>
-                <div className="text-xs text-muted">{creator.credential.label}</div>
+                <div className="font-semibold">{creator.displayName}</div>
+                <div className="text-xs text-muted">@{creator.username}</div>
               </div>
             </Link>
             <FollowButton creatorId={creator.id} />
@@ -114,7 +113,7 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           </button>
           <HelpfulButton
             tutorialId={tutorial.id}
-            countLabel={`${tutorial.helpfulPercent}% found this helpful`}
+            countLabel="Helpful"
           />
           <SaveControl tutorialId={tutorial.id} />
           <button
@@ -136,10 +135,12 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           ))}
         </div>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold">About this clip</h2>
-          <p className="text-muted mt-2 leading-relaxed">{tutorial.learn}</p>
-        </section>
+        {tutorial.learn && (
+          <section className="mt-10">
+            <h2 className="text-lg font-semibold">About this clip</h2>
+            <p className="text-muted mt-2 leading-relaxed">{tutorial.learn}</p>
+          </section>
+        )}
         {tutorial.takeaways.length > 0 && (
           <section className="mt-8">
             <h2 className="text-lg font-semibold">Key points</h2>
@@ -153,14 +154,14 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
             </ol>
           </section>
         )}
-        <section className="mt-10">
+        {related.length > 0 && <section className="mt-10">
           <h2 className="text-lg font-semibold mb-4">Related clips</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             {related.map((t) => (
               <TutorialCard key={t.id} tutorial={t} />
             ))}
           </div>
-        </section>
+        </section>}
         <div id="comments" className="mt-12">
           <CommentThread tutorialId={tutorial.id} />
         </div>

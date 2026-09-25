@@ -1,0 +1,194 @@
+[
+  {
+    "slug": "stop-making-this-roaming-mistake",
+    "title": "Stop making this roaming mistake",
+    "description": "How to recognize when leaving your lane actually gives the opponent an advantage.",
+    "takeaways": [
+      "If the wave is pushing into you, a roam donates plates and XP.",
+      "Ping the roam 8 seconds early or your jungler cannot follow.",
+      "Crash a cannon wave first \u2014 never leave a slow push to die under tower."
+    ],
+    "category": "Mid Lane",
+    "topic": "Roaming",
+    "champion": "Ahri",
+    "tags": [
+      "Ahri",
+      "MidLane",
+      "Roaming"
+    ],
+    "skill_level": "intermediate",
+    "duration_seconds": 54,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/5752729/5752729-hd_720_1280_30fps.mp4",
+    "created_at": "2026-08-12T14:00:00Z",
+    "role": "mid"
+  },
+  {
+    "slug": "how-to-punish-zed-after-w",
+    "title": "How to punish Zed after he uses W",
+    "description": "The exact window to trade, shove, or all-in once Zed's shadow is spent.",
+    "takeaways": [
+      "W is his only safe disengage \u2014 once it's down, walk up.",
+      "Hold your charm for the shadow, not the first auto.",
+      "If he uses W to farm, crash the wave and deny the bounce."
+    ],
+    "category": "Mid Lane",
+    "topic": "Matchups",
+    "champion": "Ahri",
+    "tags": [
+      "Ahri",
+      "Zed",
+      "Matchups"
+    ],
+    "skill_level": "intermediate",
+    "duration_seconds": 48,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Zed_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/8088706/8088706-hd_1080_1920_25fps.mp4",
+    "created_at": "2026-08-08T11:00:00Z",
+    "role": "mid"
+  },
+  {
+    "slug": "3-mistakes-every-silver-adc-makes",
+    "title": "3 mistakes every Silver ADC makes",
+    "description": "The spacing, wave, and fight-selection errors that keep bot lane stuck in Silver.",
+    "takeaways": [
+      "Don't auto the wave while the enemy ADC is looking to trade.",
+      "Crash before dragon \u2014 never recall on a slow push.",
+      "If your support is not there, you are not in a 2v2. Leave."
+    ],
+    "category": "ADC",
+    "topic": "Fundamentals",
+    "champion": "Jinx",
+    "tags": [
+      "ADC",
+      "Jinx",
+      "Silver"
+    ],
+    "skill_level": "beginner",
+    "duration_seconds": 60,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Jinx_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4",
+    "created_at": "2026-07-30T09:00:00Z",
+    "role": "adc"
+  },
+  {
+    "slug": "stop-taking-this-fight-as-a-jungler",
+    "title": "Stop taking this fight as a Jungler",
+    "description": "How to read tempo so you invade or path away instead of donating a kill.",
+    "takeaways": [
+      "If your bot has no prio, the river fight is not yours.",
+      "Track the enemy's second camp \u2014 that's when they're actually gankable.",
+      "A full clear into a losing 3v3 is how games get thrown at 3:30."
+    ],
+    "category": "Jungle",
+    "topic": "Tempo",
+    "champion": "Lee Sin",
+    "tags": [
+      "Jungle",
+      "LeeSin",
+      "Tempo"
+    ],
+    "skill_level": "intermediate",
+    "duration_seconds": 57,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/LeeSin_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/4990246/4990246-hd_1080_1920_25fps.mp4",
+    "created_at": "2026-08-02T16:20:00Z",
+    "role": "jungle"
+  },
+  {
+    "slug": "ahri-combo-youre-dropping-in-lane",
+    "title": "The Ahri combo you're dropping in lane",
+    "description": "How to land charm after orb without flashing it on a minion.",
+    "takeaways": [
+      "Q first only if the wave is already shoved \u2014 otherwise you lose the charm angle.",
+      "Walk off-center before E so they can't sidestep with the minion block.",
+      "Save W for the charm connect, not the approach."
+    ],
+    "category": "Mid Lane",
+    "topic": "Combos",
+    "champion": "Ahri",
+    "tags": [
+      "Ahri",
+      "Combos",
+      "Mechanics"
+    ],
+    "skill_level": "intermediate",
+    "duration_seconds": 39,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_14.jpg",
+    "video_url": "https://videos.pexels.com/video-files/5752729/5752729-hd_720_1280_30fps.mp4",
+    "created_at": "2026-08-16T13:10:00Z",
+    "role": "mid"
+  },
+  {
+    "slug": "wave-management-before-you-roam",
+    "title": "Wave management before you roam",
+    "description": "The three wave states \u2014 and which one is the only one you should leave.",
+    "takeaways": [
+      "Slow push, crash, bounce. Roam on the crash, never on the bounce.",
+      "If they freeze, you don't roam \u2014 you thin and hold.",
+      "Cannon waves are timers. Use them."
+    ],
+    "category": "Mid Lane",
+    "topic": "Macro",
+    "champion": null,
+    "tags": [
+      "MidLane",
+      "Waves",
+      "Macro"
+    ],
+    "skill_level": "intermediate",
+    "duration_seconds": 60,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Orianna_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/4990246/4990246-hd_1080_1920_25fps.mp4",
+    "created_at": "2026-08-09T17:30:00Z",
+    "role": "mid"
+  },
+  {
+    "slug": "lux-root-combo-from-fog",
+    "title": "Land Lux root from fog every time",
+    "description": "How to catch the dash-heavy mid laner without telegraphing the Q.",
+    "takeaways": [
+      "Throw Q from a brush or after a cannon last-hit animation.",
+      "E first only if you need vision \u2014 otherwise you show the play.",
+      "Flash Q is for when they used their dash, not before."
+    ],
+    "category": "Mid Lane",
+    "topic": "Combos",
+    "champion": "Lux",
+    "tags": [
+      "Lux",
+      "Combos",
+      "MidLane"
+    ],
+    "skill_level": "beginner",
+    "duration_seconds": 35,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Lux_0.jpg",
+    "video_url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "created_at": "2026-08-04T12:40:00Z",
+    "role": "mid"
+  },
+  {
+    "slug": "ranked-macro-when-to-group",
+    "title": "When grouping mid actually throws",
+    "description": "How to tell a real 5-man play from four people standing mid while the side wave dies.",
+    "takeaways": [
+      "Group for a Herald or a set-up pick \u2014 not because the chat said mid.",
+      "If the side wave will hit tower in 15 seconds, you are late.",
+      "The player with the strongest side wave stays. Everyone else rotates."
+    ],
+    "category": "Macro",
+    "topic": "Ranked",
+    "champion": null,
+    "tags": [
+      "Macro",
+      "Ranked",
+      "MidLane"
+    ],
+    "skill_level": "advanced",
+    "duration_seconds": 60,
+    "thumbnail_url": "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Yasuo_0.jpg",
+    "video_url": "https://videos.pexels.com/video-files/3195394/3195394-uhd_2560_1440_25fps.mp4",
+    "created_at": "2026-08-15T16:50:00Z",
+    "role": null
+  }
+]

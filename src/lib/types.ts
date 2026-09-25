@@ -68,6 +68,17 @@ export type Tutorial = {
   createdAt: string;
   pathId?: string;
   communityUpload?: boolean;
+  // League data (from Supabase)
+  championId?: string | null;
+  championName?: string | null;
+  roleId?: string | null;
+  mapId?: string | null;
+  patch?: string | null;
+  patchIsCurrent?: boolean;
+  upvotes?: number;
+  downvotes?: number;
+  score?: number;
+  seed?: boolean;
 };
 
 export type PathLesson = {

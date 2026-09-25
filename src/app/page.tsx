@@ -1,12 +1,14 @@
 "use client";
 
-import { Button, VerifiedMark } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { GameCard, TutorialCard } from "@/components/cards";
 import { Logo } from "@/components/Logo";
-import { creators } from "@/data/creators";
 import { games } from "@/data/games";
-import { tutorials } from "@/data/tutorials";
+import { championSplashUrl } from "@/lib/ddragon/shared";
 import { formatCount } from "@/lib/format";
+import { listTips } from "@/lib/tips";
+import type { Tutorial } from "@/lib/types";
+import { useSupabaseQuery } from "@/lib/use-tips";
 import { useApp } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { Bookmark, Heart, MessageCircle, Play, Share2 } from "lucide-react";
@@ -14,9 +16,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-function FeedPreview() {
-  const clip = tutorials[0];
-  const creator = creators.find((item) => item.id === clip.creatorId);
+const PREVIEW_FALLBACK = { title: "Punish Zed the moment his shadow is down", thumbnail: championSplashUrl("Ahri"), views: 0, likes: 0, comments: 0, creatorUsername: "eztips", creatorAvatar: "https://api.dicebear.com/9.x/adventurer/svg?seed=eztips" };
+
+function FeedPreview({ tip }: { tip?: Tutorial }) {
+  const clip = tip ?? PREVIEW_FALLBACK;
+  const creator = { username: clip.creatorUsername ?? "eztips", avatar: clip.creatorAvatar };
   return (
     <div className="relative mx-auto w-full max-w-[420px]">
       <div className="absolute -inset-8 rounded-full bg-accent/15 blur-3xl" />
@@ -43,7 +47,7 @@ function FeedPreview() {
             <span className="rounded-lg bg-accent px-2.5 py-1 text-xs font-bold">Follow</span>
           </div>
           <h2 className="text-xl font-bold leading-tight">{clip.title}</h2>
-          <p className="mt-2 text-xs font-semibold">#MidLane #Macro #Intermediate</p>
+          <p className="mt-2 text-xs font-semibold">{tip ? [tip.championName, tip.topic].filter(Boolean).map((t) => `#${t!.replace(/\s+/g, "")}`).join(" ") : "#Ahri #MidLane #Trading"}</p>
           <p className="mt-2 text-[11px] text-white/55">{formatCount(clip.views)} views</p>
         </div>
         <div className="absolute bottom-5 right-3 flex flex-col gap-4">
@@ -71,6 +75,8 @@ export default function MarketingPage() {
   const { configured } = useAuth();
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const { data: topTips } = useSupabaseQuery("landing-top", (client) => listTips(client, { sort: "top", limit: 8 }), [] as Tutorial[]);
+  const topCreators = Array.from(new Map(topTips.filter((t) => t.creatorUsername).map((t) => [t.creatorId, t] as const)).values()).slice(0, 6);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -120,7 +126,7 @@ export default function MarketingPage() {
               <div><div className="text-xl font-bold">Your games</div><div className="text-muted">Your feed</div></div>
             </div>
           </div>
-          <FeedPreview />
+          <FeedPreview tip={topTips[0]} />
         </section>
 
         <section id="games" className="mx-auto max-w-6xl px-5 py-16">
@@ -153,16 +159,15 @@ export default function MarketingPage() {
           <h2 className="text-3xl font-bold">Follow creators who make you better</h2>
           <p className="mt-2 text-muted">Real profiles, real gameplay, and a feed that learns who you trust.</p>
           <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {creators.slice(0, 6).map((creator) => (
-              <div key={creator.id} className="flex gap-3 rounded-2xl border border-border bg-card p-4">
+            {topCreators.map((tip) => (
+              <Link key={tip.creatorId} href={`/u/${tip.creatorUsername}`} className="flex gap-3 rounded-2xl border border-border bg-card p-4 hover:bg-hover">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={creator.avatar} alt="" className="h-12 w-12 rounded-full border border-border" />
+                <img src={tip.creatorAvatar} alt="" className="h-12 w-12 rounded-full border border-border" />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1 font-semibold">@{creator.username}{creator.verified && <VerifiedMark />}</div>
-                  <div className="mt-1 text-xs font-medium text-accent">{creator.mainFocus}</div>
-                  <p className="mt-2 line-clamp-2 text-xs text-muted">{creator.bio}</p>
+                  <div className="font-semibold">{tip.creatorDisplayName ?? tip.creatorUsername}</div>
+                  <div className="mt-1 text-xs text-muted">@{tip.creatorUsername}</div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </section>
@@ -170,7 +175,7 @@ export default function MarketingPage() {
         <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
           <h2 className="text-3xl font-bold">Trending community clips</h2>
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {tutorials.slice(0, 8).map((clip) => <TutorialCard key={clip.id} tutorial={clip} />)}
+            {topTips.map((clip) => <TutorialCard key={clip.id} tutorial={clip} />)}
           </div>
         </section>
 

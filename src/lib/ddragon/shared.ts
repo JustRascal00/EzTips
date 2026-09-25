@@ -24,5 +24,13 @@ export const spellIconUrl = (version: string, imageFull: string) =>
 /** Rune icons live under /cdn/img/ with a path taken from runesReforged.json. */
 export const runeIconUrl = (iconPath: string) => `${DDRAGON_BASE}/cdn/img/${iconPath}`;
 
-/** "15.18.1" -> "15.18" (the patch players talk about). */
-export const toPatch = (version: string) => version.split(".").slice(0, 2).join(".");
+/**
+ * Data Dragon version -> the patch name players use.
+ * Since 2025 Riot names patches by year (25.x, 26.x) while Data Dragon kept counting (15.x, 16.x):
+ * "16.19.1" -> "26.19". Older versions are returned as-is ("14.14.1" -> "14.14").
+ */
+export const toPatch = (version: string) => {
+  const [major, minor] = version.split(".").map((part) => Number.parseInt(part, 10));
+  if (!Number.isFinite(major) || !Number.isFinite(minor)) return version;
+  return `${major >= 15 ? major + 10 : major}.${minor}`;
+};

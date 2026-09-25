@@ -1,173 +1,85 @@
 "use client";
 
-import { GameCard, TutorialCard } from "@/components/cards";
+import { TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
-import { RightRail, RailSection, YourGamesRail } from "@/components/layout/Sidebar";
 import { SearchBar } from "@/components/SearchBar";
-import { Chip, FilterSelect } from "@/components/ui";
-import { trendingSkills } from "@/data/games";
-import { games } from "@/data/games";
-import { tutorials } from "@/data/tutorials";
-import { useApp } from "@/lib/store";
-import Link from "next/link";
+import { EmptyState, FilterSelect, Skeleton } from "@/components/ui";
+import { championIconUrl } from "@/lib/ddragon/shared";
+import { listTips } from "@/lib/tips";
+import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
+import type { Tutorial } from "@/lib/types";
 import { useMemo, useState } from "react";
 
 export default function ExplorePage() {
-  const { selectedGames } = useApp();
-  const yours = games.filter((g) => selectedGames.includes(g.id));
-  const trending = games.filter((g) => g.trending);
-  const [game, setGame] = useState("all");
-  const [skill, setSkill] = useState("all");
+  const [champion, setChampion] = useState("all");
+  const [role, setRole] = useState("all");
+  const [map, setMap] = useState("all");
   const [diff, setDiff] = useState("all");
-  const [dur, setDur] = useState("all");
-  const [sort, setSort] = useState("popular");
+  const [sort, setSort] = useState<"top" | "new">("top");
+  const { data: champions } = useChampions();
+  const { ddragonVersion } = useCurrentPatch();
 
-  const filtered = useMemo(() => {
-    let list = [...tutorials];
-    if (game !== "all") list = list.filter((t) => t.gameId === game);
-    if (skill !== "all") {
-      list = list.filter(
-        (t) =>
-          t.category.toLowerCase().includes(skill) ||
-          t.topic.toLowerCase().includes(skill) ||
-          t.tags.some((x) => x.toLowerCase().includes(skill)),
-      );
-    }
-    if (diff !== "all") list = list.filter((t) => t.skillLevel === diff);
-    if (dur === "short") list = list.filter((t) => t.duration < 45);
-    if (dur === "mid") list = list.filter((t) => t.duration >= 45 && t.duration <= 60);
-    if (dur === "long") list = list.filter((t) => t.duration > 60);
-    if (sort === "popular") list.sort((a, b) => b.views - a.views);
-    if (sort === "newest") list.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    if (sort === "helpful") list.sort((a, b) => b.helpfulPercent - a.helpfulPercent);
-    return list;
-  }, [game, skill, diff, dur, sort]);
+  const { data: tips, loading, error } = useSupabaseQuery(
+    `explore:${champion}:${role}:${map}:${diff}:${sort}`,
+    (client) => listTips(client, {
+      championId: champion === "all" ? undefined : champion,
+      roleId: role === "all" ? undefined : role,
+      mapId: map === "all" ? undefined : map,
+      skill: diff === "all" ? undefined : diff,
+      sort,
+      limit: 60,
+    }),
+    [] as Tutorial[],
+  );
+
+  // Champions that actually have tips, for the quick picker.
+  const { data: allTips } = useSupabaseQuery("explore:champion-counts", (client) => listTips(client, { limit: 500 }), [] as Tutorial[]);
+  const featured = useMemo(() => {
+    const counts = new Map<string, number>();
+    allTips.forEach((t) => t.championId && counts.set(t.championId, (counts.get(t.championId) ?? 0) + 1));
+    return champions.filter((c) => counts.has(c.id)).sort((a, b) => (counts.get(b.id) ?? 0) - (counts.get(a.id) ?? 0)).slice(0, 12);
+  }, [allTips, champions]);
 
   return (
-    <AppShell
-      publicPage
-      right={
-        <RightRail>
-          <YourGamesRail />
-          <RailSection title="Trending topics">
-            <div className="flex flex-wrap gap-1.5">
-              {trendingSkills.map((s) => (
-                <Link key={s.id} href={`/search?q=${encodeURIComponent(s.name)}`}>
-                  <Chip>{s.name}</Chip>
-                </Link>
-              ))}
-            </div>
-          </RailSection>
-        </RightRail>
-      }
-    >
-      <div className="px-6 py-8 max-w-5xl">
+    <AppShell publicPage>
+      <div className="px-4 py-8 max-w-5xl sm:px-6">
         <h1 className="text-3xl font-bold">Explore</h1>
-        <p className="text-muted mt-1">Discover community videos outside your usual feed by game, topic, or creator.</p>
+        <p className="text-muted mt-1">Browse League tips by champion, role and map.</p>
         <SearchBar large className="mt-6" />
 
-        {yours.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-lg font-semibold mb-3">Your Games</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {yours.map((g) => (
-                <GameCard key={g.id} game={g} large />
+        {featured.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-sm font-semibold text-muted mb-3">Champions with tips</h2>
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              <button type="button" onClick={() => setChampion("all")} className={`shrink-0 rounded-xl border px-3 text-sm font-semibold ${champion === "all" ? "border-accent bg-accent/15 text-white" : "border-border bg-card text-muted"}`}>All</button>
+              {featured.map((c) => (
+                <button key={c.id} type="button" onClick={() => setChampion(c.id)} className={`flex shrink-0 items-center gap-2 rounded-xl border py-1 pl-1 pr-3 text-sm ${champion === c.id ? "border-accent bg-accent/15 text-white" : "border-border bg-card text-muted hover:text-white"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={championIconUrl(ddragonVersion, c.id)} alt="" className="h-8 w-8 rounded-lg" />
+                  {c.name}
+                </button>
               ))}
             </div>
           </section>
         )}
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Trending Games</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {trending.map((g) => (
-              <GameCard key={g.id} game={g} />
-            ))}
-          </div>
-        </section>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">
+          <FilterSelect label="Champion" value={champion} onChange={setChampion} options={[{ id: "all", label: "Any champion" }, ...champions.map((c) => ({ id: c.id, label: c.name }))]} />
+          <FilterSelect label="Role" value={role} onChange={setRole} options={[{ id: "all", label: "Any role" }, { id: "top", label: "Top" }, { id: "jungle", label: "Jungle" }, { id: "mid", label: "Mid" }, { id: "adc", label: "ADC" }, { id: "support", label: "Support" }]} />
+          <FilterSelect label="Map" value={map} onChange={setMap} options={[{ id: "all", label: "Any map" }, { id: "sr", label: "Summoner's Rift" }, { id: "aram", label: "ARAM" }, { id: "arena", label: "Arena" }]} />
+          <FilterSelect label="Difficulty" value={diff} onChange={setDiff} options={[{ id: "all", label: "Any" }, { id: "beginner", label: "Beginner" }, { id: "intermediate", label: "Intermediate" }, { id: "advanced", label: "Advanced" }]} />
+          <FilterSelect label="Sort" value={sort} onChange={(v) => setSort(v as "top" | "new")} options={[{ id: "top", label: "Top voted" }, { id: "new", label: "Newest" }]} />
+        </div>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Trending Skills</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {trendingSkills.map((s) => (
-              <Link
-                key={s.id}
-                href={`/search?q=${encodeURIComponent(s.name)}`}
-                className="rounded-2xl border border-border bg-card p-4 hover:bg-hover transition-colors duration-200"
-              >
-                <div className="font-semibold">{s.name}</div>
-                <div className="text-xs text-muted mt-1">{s.tutorials} clips</div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <div className="flex items-end justify-between gap-4 flex-wrap">
-            <h2 className="text-lg font-semibold">Trending Videos</h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
-            <FilterSelect
-              label="Game"
-              value={game}
-              onChange={setGame}
-              options={[
-                { id: "all", label: "All games" },
-                ...games.map((g) => ({ id: g.id, label: g.name })),
-              ]}
-            />
-            <FilterSelect
-              label="Skill"
-              value={skill}
-              onChange={setSkill}
-              options={[
-                { id: "all", label: "All skills" },
-                { id: "aim", label: "Aim" },
-                { id: "mid", label: "Mid / lane" },
-                { id: "macro", label: "Macro" },
-                { id: "utility", label: "Utility" },
-                { id: "farm", label: "Farms" },
-              ]}
-            />
-            <FilterSelect
-              label="Difficulty"
-              value={diff}
-              onChange={setDiff}
-              options={[
-                { id: "all", label: "Any" },
-                { id: "beginner", label: "Beginner" },
-                { id: "intermediate", label: "Intermediate" },
-                { id: "advanced", label: "Advanced" },
-              ]}
-            />
-            <FilterSelect
-              label="Duration"
-              value={dur}
-              onChange={setDur}
-              options={[
-                { id: "all", label: "Any length" },
-                { id: "short", label: "Under 45s" },
-                { id: "mid", label: "45–60s" },
-                { id: "long", label: "Over 1 min" },
-              ]}
-            />
-            <FilterSelect
-              label="Sort"
-              value={sort}
-              onChange={setSort}
-              options={[
-                { id: "popular", label: "Popularity" },
-                { id: "newest", label: "Newest" },
-                { id: "helpful", label: "Most helpful" },
-              ]}
-            />
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-            {filtered.map((t) => (
-              <TutorialCard key={t.id} tutorial={t} />
-            ))}
-          </div>
-        </section>
+        {error && <p className="mt-6 text-sm text-danger">Couldn&apos;t load tips: {error}</p>}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+          {loading
+            ? [0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="aspect-[16/10] rounded-2xl" />)
+            : tips.map((t) => <TutorialCard key={t.id} tutorial={t} />)}
+        </div>
+        {!loading && !error && tips.length === 0 && (
+          <div className="mt-6"><EmptyState title="No tips match these filters" body="Try another champion or role, or upload the first one." /></div>
+        )}
       </div>
     </AppShell>
   );

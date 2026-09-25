@@ -1,6 +1,5 @@
 "use client";
 
-import { creators } from "@/data/creators";
 import { games } from "@/data/games";
 import { formatCount, formatDuration, skillLabel } from "@/lib/format";
 import type { Creator, Game, LearningPath, Tutorial } from "@/lib/types";
@@ -81,8 +80,7 @@ export function TutorialCard({
   compact?: boolean;
 }) {
   const [hover, setHover] = useState(false);
-  const game = games.find((g) => g.id === tutorial.gameId);
-  const creator = creators.find((c) => c.id === tutorial.creatorId);
+  const roleLabel = tutorial.roleId ? ROLE_LABELS[tutorial.roleId] : null;
 
   return (
     <Link
@@ -119,20 +117,42 @@ export function TutorialCard({
         <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-medium">
           {formatDuration(tutorial.duration)}
         </span>
-        <span className="absolute top-2 left-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] text-white/90">
-          {tutorial.helpfulPercent}% helpful
+        <span
+          className={cn(
+            "absolute top-2 left-2 rounded-md px-1.5 py-0.5 text-[11px] font-semibold",
+            tutorial.patch && tutorial.patchIsCurrent ? "bg-accent/85 text-white" : "bg-black/70 text-white/80",
+          )}
+        >
+          {tutorial.patch ? `Patch ${tutorial.patch}` : "Patch ?"}
         </span>
       </div>
       <div className="mt-2.5">
         <div className="text-[13px] text-muted">
-          {game?.name} · {tutorial.category} · {skillLabel(tutorial.skillLevel)}
+          {[tutorial.championName, roleLabel, tutorial.topic].filter(Boolean).join(" · ") || skillLabel(tutorial.skillLevel)}
         </div>
         <h3 className="mt-0.5 font-semibold leading-snug line-clamp-2 group-hover:text-white">
           {tutorial.title}
         </h3>
         <div className="mt-1 text-xs text-muted">
-          @{creator?.username} · {formatCount(tutorial.views)} views
+          {tutorial.creatorUsername ? `@${tutorial.creatorUsername} · ` : ""}{formatCount(tutorial.views)} views{typeof tutorial.score === "number" ? ` · ${tutorial.score >= 0 ? "▲" : "▼"} ${Math.abs(tutorial.score)}` : ""}
         </div>
+      </div>
+    </Link>
+  );
+}
+
+const ROLE_LABELS: Record<string, string> = { top: "Top", jungle: "Jungle", mid: "Mid", adc: "ADC", support: "Support" };
+
+/** A real profile (from Supabase). */
+export function ProfileCard({ profile }: { profile: { username: string; display_name: string; avatar_url: string | null; bio?: string } }) {
+  const avatar = profile.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(profile.username)}`;
+  return (
+    <Link href={`/u/${profile.username}`} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 hover:bg-hover transition-colors duration-200">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={avatar} alt="" className="h-12 w-12 rounded-full border border-border object-cover" />
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold truncate">{profile.display_name}</div>
+        <div className="text-xs text-muted truncate">@{profile.username}{profile.bio ? ` · ${profile.bio}` : ""}</div>
       </div>
     </Link>
   );

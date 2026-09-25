@@ -15,7 +15,6 @@ import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
 import { currentUserSeed } from "@/data/creators";
 import { learningPaths } from "@/data/paths";
-import { tutorials } from "@/data/tutorials";
 import type {
   AppNotification,
   Collection,
@@ -229,8 +228,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const on = s.saved.includes(id);
         return { ...s, saved: on ? s.saved.filter((x) => x !== id) : [...s.saved, id] };
       });
-      const t = tutorials.find((x) => x.id === id);
-      toast(already ? "Removed from saved" : t ? `Saved · ${t.title}` : "Saved");
+      toast(already ? "Removed from saved" : "Saved");
     },
     [toast],
   );
