@@ -171,7 +171,7 @@ export function MobileNav() {
 
 export function RightRail({ children }: { children?: React.ReactNode }) {
   return (
-    <aside className="hidden xl:block w-[300px] shrink-0 h-screen sticky top-0 border-l border-border bg-sidebar overflow-y-auto p-4">
+    <aside className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] w-[300px] shrink-0 overflow-y-auto rounded-2xl border border-white/[0.06] bg-panel p-4 xl:block">
       {children}
     </aside>
   );

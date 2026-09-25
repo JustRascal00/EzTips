@@ -23,7 +23,7 @@ export default function CreatorPage() {
 
   return (
     <AppShell publicPage>
-      <div className="px-6 py-8 max-w-5xl">
+      <div className="py-8 max-w-5xl">
         <div className="flex flex-col sm:flex-row gap-6 items-start">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={creator.avatar} alt="" className="h-24 w-24 rounded-full border border-border" />

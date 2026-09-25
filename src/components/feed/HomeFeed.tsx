@@ -2,327 +2,237 @@
 
 import { FollowButton, PatchBadge, SaveControl, VoteControl } from "@/components/actions";
 import { CommentThread } from "@/components/Comments";
-import { GameLogo } from "@/components/GameLogo";
+import { ChampionIcon } from "@/components/league";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { games } from "@/data/games";
+import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { championIconUrl } from "@/lib/ddragon/shared";
 import { formatCount } from "@/lib/format";
+import { ROLE_LABEL } from "@/lib/league";
 import { useApp, type VideoSignal } from "@/lib/store";
-import { listTips, searchCreators, searchTips, type CreatorSummary } from "@/lib/tips";
+import { listTips } from "@/lib/tips";
 import type { Tutorial } from "@/lib/types";
-import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
-import { ArrowDown, CheckCircle2, Clock3, MessageCircle, MoreHorizontal, Plus, Search, Share2, Sparkles, X } from "lucide-react";
+import { useSupabaseQuery } from "@/lib/use-tips";
+import { CheckCircle2, ChevronDown, ChevronUp, MessageCircle, Share2, Sparkles, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type FeedTab = "foryou" | "following" | "explore";
+type FeedTab = "foryou" | "following";
 type FeedBehavior = { liked: string[]; saved: string[]; completedTutorials: string[]; followedCreators: string[]; searches: string[]; videoSignals: Record<string, VideoSignal> };
 
-function personalizedOrder(list: Tutorial[], gameOrder: string[], behavior: FeedBehavior) {
-  const topicAffinity = new Map<string, number>();
-  const gameAffinity = new Map<string, number>();
-  const addAffinity = (tutorial: Tutorial, weight: number) => {
-    gameAffinity.set(tutorial.gameId, (gameAffinity.get(tutorial.gameId) ?? 0) + weight);
-    [tutorial.category, tutorial.topic, ...tutorial.tags].forEach((value) => topicAffinity.set(value.toLowerCase(), (topicAffinity.get(value.toLowerCase()) ?? 0) + weight));
-  };
-  list.forEach((tutorial) => {
-    const signal = behavior.videoSignals[tutorial.id];
-    let weight = (behavior.liked.includes(tutorial.id) ? 3 : 0) + (behavior.saved.includes(tutorial.id) ? 5 : 0) + (behavior.completedTutorials.includes(tutorial.id) ? 2 : 0);
-    if (signal) weight += signal.completions * 3 + signal.rewatches * 2 + signal.shares * 4 - signal.skips * 1.5;
-    if (weight) addAffinity(tutorial, weight);
-  });
-  const score = (tutorial: Tutorial) => {
-    const signal = behavior.videoSignals[tutorial.id];
-    const topicScore = [tutorial.category, tutorial.topic, ...tutorial.tags].reduce((sum, value) => sum + (topicAffinity.get(value.toLowerCase()) ?? 0), 0);
-    const searchable = `${tutorial.title} ${tutorial.category} ${tutorial.topic} ${tutorial.tags.join(" ")}`.toLowerCase();
-    const searchScore = behavior.searches.reduce((sum, query) => sum + query.toLowerCase().split(/\s+/).filter((word) => word.length > 2 && searchable.includes(word)).length * 1.5, 0);
-    return Math.log10(tutorial.views + 1) * 0.25 + topicScore * 0.45 + searchScore + (behavior.followedCreators.includes(tutorial.creatorId) ? 4 : 0) - (signal?.completions ?? 0) * 0.5;
-  };
-  const groups = new Map<string, Tutorial[]>();
-  gameOrder.forEach((gameId) => groups.set(gameId, list.filter((tutorial) => tutorial.gameId === gameId).sort((a, b) => score(b) - score(a))));
-  const cycle = gameOrder.flatMap((gameId) => Array.from({ length: Math.max(1, Math.min(3, 1 + Math.floor(Math.max(0, gameAffinity.get(gameId) ?? 0) / 8))) }, () => gameId));
-  const ordered: Tutorial[] = [];
-  let remaining = list.length;
-  while (remaining > 0) {
-    let added = 0;
-    cycle.forEach((gameId) => { const next = groups.get(gameId)?.shift(); if (next) { ordered.push(next); remaining -= 1; added += 1; } });
-    if (!added) break;
+/** Personal ordering: champions/topics you engage with float up, finished clips sink. */
+function personalizedOrder(list: Tutorial[], behavior: FeedBehavior) {
+  const affinity = new Map<string, number>();
+  const keys = (t: Tutorial) => [t.championId ?? "", t.roleId ?? "", t.topic, ...t.tags].filter(Boolean).map((k) => k.toLowerCase());
+  for (const t of list) {
+    const s = behavior.videoSignals[t.id];
+    let w = (behavior.liked.includes(t.id) ? 3 : 0) + (behavior.saved.includes(t.id) ? 5 : 0) + (behavior.completedTutorials.includes(t.id) ? 2 : 0);
+    if (s) w += s.completions * 3 + s.rewatches * 2 + s.shares * 4 - s.skips * 1.5;
+    if (w) keys(t).forEach((k) => affinity.set(k, (affinity.get(k) ?? 0) + w));
   }
-  return ordered;
+  const score = (t: Tutorial) => {
+    const s = behavior.videoSignals[t.id];
+    const topic = keys(t).reduce((sum, k) => sum + (affinity.get(k) ?? 0), 0);
+    const text = `${t.title} ${t.championName ?? ""} ${t.topic} ${t.tags.join(" ")}`.toLowerCase();
+    const search = behavior.searches.reduce((sum, q) => sum + q.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && text.includes(w)).length * 1.5, 0);
+    return (t.score ?? 0) * 0.6 + topic * 0.45 + search + (behavior.followedCreators.includes(t.creatorId) ? 4 : 0) - (t.outdated ? 6 : 0) - (s?.completions ?? 0) * 2;
+  };
+  return [...list].sort((a, b) => score(b) - score(a));
 }
 
-function ActionButton({ label, count, active, onClick, children }: { label: string; count?: number; active?: boolean; onClick?: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-label={label} title={label} onClick={onClick} className={cn("group flex flex-col items-center gap-1 text-[10px] font-semibold text-white/65", active && "text-[#ff5f8f]")}><span className={cn("grid h-10 w-10 place-items-center rounded-full bg-white/[0.09] shadow-lg backdrop-blur-xl transition-all duration-200 group-hover:-translate-y-0.5 group-hover:bg-white/15", active && "bg-[#ff5f8f]/18")}>{children}</span><span>{count === undefined ? label : formatCount(count)}</span></button>;
-}
-
-function useDebounced<T>(value: T, ms: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => { const timer = window.setTimeout(() => setDebounced(value), ms); return () => window.clearTimeout(timer); }, [value, ms]);
-  return debounced;
-}
-
-function DiscoverySearch() {
-  const router = useRouter();
-  const { searches, recordSearch } = useApp();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const normalized = query.trim().toLowerCase();
-  const debounced = useDebounced(normalized, 250);
-  const { data: champions } = useChampions();
-  const { ddragonVersion } = useCurrentPatch();
-  const compact = normalized.replace(/[^a-z0-9]/g, "");
-  const matchingChampions = compact.length >= 2 ? champions.filter((c) => c.name.toLowerCase().replace(/[^a-z0-9]/g, "").includes(compact)).slice(0, 3) : [];
-  const { data: tipResults } = useSupabaseQuery(`dropdown-tips:${debounced}`, (client) => (debounced.length >= 2 ? searchTips(client, debounced, { limit: 4 }) : Promise.resolve([])), [] as Tutorial[]);
-  const { data: creatorResults } = useSupabaseQuery(`dropdown-creators:${debounced}`, (client) => searchCreators(client, debounced, 3), [] as CreatorSummary[]);
-  const matchingTips = debounced === normalized ? tipResults : [];
-  const matchingCreators = debounced === normalized ? creatorResults : [];
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "/" && !["INPUT", "TEXTAREA"].includes((event.target as HTMLElement)?.tagName)) {
-        event.preventDefault(); inputRef.current?.focus(); setOpen(true);
-      }
-      if (event.key === "Escape") { setOpen(false); inputRef.current?.blur(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  function submit(value = query) {
-    const next = value.trim();
-    if (!next) return;
-    recordSearch(next); setOpen(false); router.push(`/search?q=${encodeURIComponent(next)}`);
-  }
-
+function RailButton({ label, count, onClick, children }: { label: string; count?: number; onClick?: () => void; children: React.ReactNode }) {
   return (
-    <div className="relative mx-auto w-full max-w-[590px]">
-      <form onSubmit={(event) => { event.preventDefault(); submit(); }} className={cn("relative z-50 transition-all duration-200", open && "scale-[1.01]")}>
-        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-        <input ref={inputRef} value={query} onChange={(event) => { setQuery(event.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder="Search champions, mechanics, maps, creators…" className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.045] pl-10 pr-12 text-sm outline-none transition-colors placeholder:text-muted focus:border-accent/50 focus:bg-[#11131a]" />
-        <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-white/10 bg-black/20 px-2 py-0.5 text-[10px] text-muted">/</kbd>
-      </form>
-      {open && (
-        <>
-          <button aria-label="Close search" onClick={() => setOpen(false)} className="fixed inset-0 z-40 cursor-default bg-black/25" />
-          <div className="absolute inset-x-0 top-12 z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl shadow-black/60">
-            {!normalized ? (
-              <div className="p-3">
-                <div className="px-2 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Quick discovery</div>
-                <div className="flex flex-wrap gap-2 px-2 pb-3">{["Ahri combo", "Wave management", "Jungle tempo", "How to punish Zed"].map((term) => <button key={term} onClick={() => submit(term)} className="rounded-full border border-white/[0.07] bg-white/[0.04] px-3 py-1.5 text-xs text-white/75 hover:bg-white/[0.08]">{term}</button>)}</div>
-                {searches.length > 0 && <><div className="border-t border-white/[0.06] px-2 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Recent</div>{searches.slice(-3).reverse().map((term) => <button key={term} onClick={() => submit(term)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm hover:bg-white/[0.05]"><Clock3 className="h-4 w-4 text-muted" />{term}</button>)}</>}
-              </div>
-            ) : (
-              <div className="p-2">
-                {matchingChampions.length > 0 && <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Champions</div>}
-                {matchingChampions.map((champion) => <button key={champion.id} type="button" onClick={() => submit(champion.name)} className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left hover:bg-white/[0.05]"><img src={championIconUrl(ddragonVersion, champion.id)} alt="" className="h-8 w-8 rounded-lg" /><div className="text-sm font-semibold">{champion.name}</div><div className="truncate text-xs text-muted">{champion.title}</div></button>)}
-                {matchingTips.length > 0 && <div className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Topics & tips</div>}
-                {matchingTips.map((tip) => <Link key={tip.id} href={`/t/${tip.slug}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={tip.thumbnail} alt="" className="h-10 w-14 rounded-lg object-cover" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{tip.title}</div><div className="text-xs text-muted">{[tip.championName, tip.topic, tip.patch ? `Patch ${tip.patch}` : null].filter(Boolean).join(" · ")}</div></div></Link>)}
-                {matchingCreators.length > 0 && <div className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted">Creators</div>}
-                {matchingCreators.map((creator) => <Link key={creator.id} href={`/u/${creator.username}`} onClick={() => setOpen(false)} className="flex items-center gap-3 rounded-xl p-2.5 hover:bg-white/[0.05]"><img src={creator.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(creator.username)}`} alt="" className="h-8 w-8 rounded-full object-cover" /><div><div className="text-sm font-semibold">{creator.display_name}</div><div className="text-xs text-muted">@{creator.username}</div></div></Link>)}
-                {!matchingChampions.length && !matchingTips.length && !matchingCreators.length && <button onClick={() => submit()} className="flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm hover:bg-white/[0.05]"><Search className="h-4 w-4 text-accent" />Search all of EZTips for “{query}”</button>}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+    <button type="button" aria-label={label} title={label} onClick={onClick} className="group flex flex-col items-center gap-1 text-[11px] font-bold text-white/80">
+      <span className="grid h-11 w-11 place-items-center rounded-full border border-white/10 bg-black/45 backdrop-blur-md transition group-hover:bg-white/15 md:bg-white/[0.07]">{children}</span>
+      {count !== undefined && <span className="tabular">{formatCount(count)}</span>}
+    </button>
   );
 }
 
-type FeedCreator = { id: string; username: string; displayName: string; avatar: string };
-
-function creatorOf(tutorial: Tutorial): FeedCreator | undefined {
-  if (!tutorial.creatorUsername) return undefined;
-  return { id: tutorial.creatorId, username: tutorial.creatorUsername, displayName: tutorial.creatorDisplayName || tutorial.creatorUsername, avatar: tutorial.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(tutorial.creatorUsername)}` };
+function creatorAvatar(t: Tutorial) {
+  return t.creatorAvatar || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(t.creatorUsername ?? "eztips")}`;
 }
 
-function FeedItem({ tutorial, nextTutorial, trending, suggestedCreators, active, onActivate, onOpenComments }: { tutorial: Tutorial; nextTutorial?: Tutorial; trending: Tutorial[]; suggestedCreators: FeedCreator[]; active: boolean; onActivate: () => void; onOpenComments: () => void }) {
-  const game = games.find((item) => item.id === tutorial.gameId);
-  const creator = creatorOf(tutorial);
+function FeedItem({ tip, active, onActivate, onOpenComments }: { tip: Tutorial; active: boolean; onActivate: () => void; onOpenComments: () => void }) {
   const { completedTutorials, toast, recordVideoComplete, recordVideoShare } = useApp();
-  const watched = completedTutorials.includes(tutorial.id);
-  const displayTags = Array.from(new Map(
-    [tutorial.championName ?? tutorial.character, tutorial.topic, ...tutorial.tags]
-      .filter((tag): tag is string => Boolean(tag?.trim()))
-      .map((tag) => [tag.trim().toLocaleLowerCase(), tag.trim()] as const),
-  ).values()).slice(0, 3);
-  const itemRef = useRef<HTMLElement>(null);
+  const watched = completedTutorials.includes(tip.id);
+  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const element = itemRef.current;
-    if (!element) return;
+    const el = ref.current;
+    if (!el) return;
     const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting && entry.intersectionRatio >= 0.68) onActivate(); }, { threshold: [0.68] });
-    observer.observe(element);
+    observer.observe(el);
     return () => observer.disconnect();
   }, [onActivate]);
 
   return (
-    <section ref={itemRef} data-feed-item className="snap-item relative flex h-full min-h-full items-center justify-center px-3 py-4 sm:px-6">
-      <div className="relative grid w-full max-w-[1160px] items-center justify-center 2xl:grid-cols-[minmax(500px,610px)_300px] 2xl:gap-20">
-        <article className="relative mx-auto w-full max-w-[560px] pr-12 sm:pr-14">
-          <div className="absolute -inset-16 -z-10 rounded-full opacity-20 blur-[90px] transition-colors duration-700" style={{ background: `radial-gradient(circle, ${game?.tint ?? "#7657ff"}, transparent 68%)` }} />
-          <div className="relative h-[calc(100dvh-10.5rem)] min-h-[560px] max-h-[760px] overflow-hidden rounded-[30px] bg-black shadow-[0_30px_90px_rgba(0,0,0,.5)]">
-            <VideoPlayer src={tutorial.videoUrl} poster={tutorial.thumbnail} active={active} onEnded={() => recordVideoComplete(tutorial.id)} vertical className="absolute inset-0 h-full w-full rounded-[30px]" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-black via-black/65 to-transparent" />
-            <div className="absolute inset-x-5 bottom-5 z-20 pr-2 sm:inset-x-6 sm:bottom-6">
-              {creator && <div className="mb-3 flex items-center gap-2.5"><Link href={`/u/${creator.username}`} className="flex min-w-0 items-center gap-2.5"><img src={creator.avatar} alt={creator.displayName} className="h-9 w-9 rounded-full border border-white/20 object-cover" /><span className="truncate text-sm font-semibold text-white">@{creator.username}</span></Link><FollowButton creatorId={tutorial.creatorId} size="sm" />{watched && <span className="ml-auto flex items-center gap-1 text-[10px] text-white/60"><CheckCircle2 className="h-3.5 w-3.5 text-success" />Watched</span>}</div>}
-              <Link href={`/t/${tutorial.slug}`}><h2 className="max-w-[440px] text-xl font-bold leading-tight text-white sm:text-[23px]">{tutorial.title}</h2></Link>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
-                <PatchBadge patch={tutorial.patch} current={tutorial.patchIsCurrent} outdated={tutorial.outdated} />
-                {typeof tutorial.stillWorksPct === "number" && <span className="rounded-md bg-success/15 px-1.5 py-0.5 text-[11px] font-semibold text-success">{tutorial.stillWorksPct}% still works</span>}
-                {displayTags.map((tag) => <Link key={tag.toLocaleLowerCase()} href={`/search?q=${encodeURIComponent(tag)}`} className="rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/80 backdrop-blur-sm hover:bg-white/15">{tag}</Link>)}
-              </div>
-              <div className="mt-2 text-[11px] text-white/45">{formatCount(tutorial.views)} views · {tutorial.duration}s</div>
+    <section ref={ref} data-feed-item className="snap-item relative flex h-full items-center justify-center md:py-4">
+      <div className="relative h-full md:h-[calc(100%-0.5rem)]">
+        <article className="relative h-full w-screen overflow-hidden bg-black md:aspect-[9/16] md:w-auto md:max-w-[calc(100vw-9rem)] md:rounded-[28px] md:border md:border-white/[0.06] md:shadow-[0_30px_90px_rgba(0,0,0,.6)]">
+          <VideoPlayer src={tip.videoUrl} poster={tip.thumbnail} active={active} onEnded={() => recordVideoComplete(tip.id)} vertical className="absolute inset-0 h-full w-full" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-t from-black via-black/60 to-transparent" />
+
+          <div className="absolute inset-x-4 bottom-5 z-20 pr-16 md:inset-x-5 md:pr-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {tip.championId && (
+                <Link href={`/champions/${tip.championId}`} className="inline-flex items-center gap-1.5 rounded-lg bg-black/50 py-0.5 pl-0.5 pr-2 text-xs font-bold text-white backdrop-blur hover:bg-black/70">
+                  <ChampionIcon id={tip.championId} size={22} className="rounded-md" />{tip.championName}
+                </Link>
+              )}
+              {tip.roleId && <span className="rounded-lg bg-black/50 px-2 py-1 text-[11px] font-bold text-white/80 backdrop-blur">{ROLE_LABEL[tip.roleId]}</span>}
+              <PatchBadge patch={tip.patch} current={tip.patchIsCurrent} outdated={tip.outdated} />
+              {typeof tip.stillWorksPct === "number" && <span className="rounded-md bg-success/20 px-1.5 py-0.5 text-[11px] font-bold text-success">{tip.stillWorksPct}% works</span>}
             </div>
-          </div>
-          <div className="absolute bottom-5 right-0 z-30 flex flex-col items-center gap-3">
-            <VoteControl vertical tipId={tutorial.id} ownerId={tutorial.creatorId} initial={{ upvotes: tutorial.upvotes ?? 0, downvotes: tutorial.downvotes ?? 0, score: tutorial.score ?? 0 }} />
-            <ActionButton label="Comments" count={tutorial.comments} onClick={onOpenComments}><MessageCircle className="h-[18px] w-[18px]" /></ActionButton>
-            <SaveControl tutorialId={tutorial.id} vertical />
-            <ActionButton label="Share" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/t/${tutorial.slug}`); recordVideoShare(tutorial.id); toast("Link copied"); }}><Share2 className="h-[18px] w-[18px]" /></ActionButton>
-            <ActionButton label="More"><MoreHorizontal className="h-[18px] w-[18px]" /></ActionButton>
+            <Link href={`/t/${tip.slug}`}><h2 className="mt-2.5 text-xl font-bold leading-tight text-white drop-shadow sm:text-[22px]">{tip.title}</h2></Link>
+            {tip.learn && <p className="mt-1.5 line-clamp-2 text-[13px] leading-5 text-white/70">{tip.learn}</p>}
+            {tip.creatorUsername && (
+              <div className="mt-3 flex items-center gap-2.5">
+                <Link href={`/u/${tip.creatorUsername}`} className="flex min-w-0 items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={creatorAvatar(tip)} alt="" className="h-8 w-8 rounded-full border border-white/20" />
+                  <span className="truncate text-sm font-semibold text-white">@{tip.creatorUsername}</span>
+                </Link>
+                <FollowButton creatorId={tip.creatorId} size="sm" />
+                {watched && <span className="ml-auto flex items-center gap-1 text-[11px] text-white/60"><CheckCircle2 className="h-3.5 w-3.5 text-success" />Watched</span>}
+              </div>
+            )}
           </div>
         </article>
 
-        <aside className="hidden self-stretch py-8 2xl:flex 2xl:flex-col">
-          <section>
-            <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold">Trending today</h3><Link href="/explore" className="text-xs text-muted hover:text-white">See all</Link></div>
-            <div className="space-y-4">{[nextTutorial, ...trending.filter((tip) => tip.id !== tutorial.id && tip.id !== nextTutorial?.id).slice(0, 2)].filter(Boolean).map((tip, position) => <Link key={tip!.id} href={`/t/${tip!.slug}`} className="group flex items-center gap-3"><div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-card"><img src={tip!.thumbnail} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" /><span className="absolute bottom-1 right-1 rounded bg-black/65 px-1 text-[9px] text-white">{tip!.duration}s</span></div><div className="min-w-0"><div className="line-clamp-2 text-sm font-medium leading-snug text-white/85 group-hover:text-white">{tip!.title}</div><div className="mt-1 text-[11px] text-muted">{tip!.championName ?? tip!.topic} · #{position + 1} trending</div></div></Link>)}</div>
-          </section>
-          {suggestedCreators.length > 0 && <section className="mt-9 border-t border-white/[0.06] pt-7">
-            <h3 className="mb-4 text-sm font-semibold">Creators for you</h3>
-            <div className="space-y-4">{suggestedCreators.slice(0, 3).map((item) => <div key={item.id} className="flex items-center gap-3"><img src={item.avatar} alt="" className="h-9 w-9 rounded-full object-cover" /><Link href={`/u/${item.username}`} className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{item.displayName}</div><div className="truncate text-[11px] text-muted">@{item.username}</div></Link><FollowButton creatorId={item.id} size="sm" /></div>)}</div>
-          </section>}
-          <div className="mt-auto flex items-center gap-2 text-[10px] text-muted"><ArrowDown className="h-3.5 w-3.5" />J / K to move through tips</div>
-        </aside>
+        {/* action rail: inside the video on phones, beside it on desktop */}
+        <div className="absolute bottom-6 right-3 z-30 flex flex-col items-center gap-3.5 md:-right-[72px] md:bottom-2">
+          <VoteControl vertical tipId={tip.id} ownerId={tip.creatorId} initial={{ upvotes: tip.upvotes ?? 0, downvotes: tip.downvotes ?? 0, score: tip.score ?? 0 }} />
+          <RailButton label="Comments" count={tip.comments} onClick={onOpenComments}><MessageCircle className="h-5 w-5" /></RailButton>
+          <SaveControl tutorialId={tip.id} vertical />
+          <RailButton label="Share" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/t/${tip.slug}`); recordVideoShare(tip.id); toast("Link copied"); }}><Share2 className="h-5 w-5" /></RailButton>
+        </div>
       </div>
     </section>
   );
 }
 
 export function HomeFeed() {
-  const { selectedGames, followedCreators, liked, saved, completedTutorials, searches, videoSignals, addHistory, recordVideoStart, recordVideoSkip, toggleSave, toggleFollowCreator } = useApp();
+  const { followedCreators, liked, saved, completedTutorials, searches, videoSignals, addHistory, recordVideoStart, recordVideoSkip, toggleSave, toggleFollowCreator, isLoggedIn } = useApp();
   const [tab, setTab] = useState<FeedTab>("foryou");
-  const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
-  const { data: communityVideos } = useSupabaseQuery("home-feed", (client) => listTips(client, { limit: 100 }), [] as Tutorial[]);
-  const [commentsVideo, setCommentsVideo] = useState<Tutorial | null>(null);
+  const [commentsTip, setCommentsTip] = useState<Tutorial | null>(null);
+  const { data: tips, loading } = useSupabaseQuery("home-feed", (client) => listTips(client, { sort: "top", limit: 100 }), [] as Tutorial[]);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const activeIndexRef = useRef(0);
-  const wheelLockRef = useRef(false);
-  const wheelDeltaRef = useRef(0);
+  const wheelLock = useRef(false);
+  const wheelDelta = useRef(0);
   const behavior = useMemo<FeedBehavior>(() => ({ liked, saved, completedTutorials, followedCreators, searches, videoSignals }), [completedTutorials, followedCreators, liked, saved, searches, videoSignals]);
 
-  const availableGames = useMemo(() => games.filter((game) => (tab === "explore" ? games.map((item) => item.id) : selectedGames).includes(game.id)), [selectedGames, tab]);
+  // Order is computed once per tab/data load so the feed doesn't reshuffle while you watch.
   const feed = useMemo(() => {
-    let list = [...communityVideos];
-    if (tab === "following") list = list.filter((tutorial) => followedCreators.includes(tutorial.creatorId));
-    else if (tab === "foryou" && selectedGames.length) list = list.filter((tutorial) => selectedGames.includes(tutorial.gameId));
-    if (activeGames.length) list = list.filter((tutorial) => activeGames.includes(tutorial.gameId));
-    return tab === "foryou" ? personalizedOrder(list, activeGames.length ? activeGames : selectedGames, behavior) : list;
-  }, [activeGames, behavior, communityVideos, followedCreators, selectedGames, tab]);
+    if (tab === "following") return tips.filter((t) => followedCreators.includes(t.creatorId));
+    return personalizedOrder(tips, behavior);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, tips]);
 
-  const resetFeed = useCallback(() => { setActiveGames([]); setActiveIndex(0); activeIndexRef.current = 0; scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }, []);
-  const toggleGameFilter = useCallback((gameId: string) => { setActiveGames((current) => current.includes(gameId) ? current.filter((id) => id !== gameId) : [...current, gameId]); setActiveIndex(0); activeIndexRef.current = 0; scrollerRef.current?.scrollTo({ top: 0, behavior: "smooth" }); }, []);
+  const scrollTo = useCallback((index: number) => {
+    const scroller = scrollerRef.current;
+    const target = scroller?.querySelectorAll<HTMLElement>("[data-feed-item]")[index];
+    if (!scroller || !target) return;
+    activeIndexRef.current = index;
+    setActiveIndex(index);
+    scroller.scrollTo({ top: target.offsetTop, behavior: "smooth" });
+  }, []);
+
+  const switchTab = (next: FeedTab) => { setTab(next); setActiveIndex(0); activeIndexRef.current = 0; scrollerRef.current?.scrollTo({ top: 0 }); };
 
   useEffect(() => { activeIndexRef.current = activeIndex; }, [activeIndex]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    let unlockTimer: number | undefined;
-    const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || commentsVideo) return;
-      event.preventDefault();
-      if (wheelLockRef.current) return;
-      wheelDeltaRef.current += event.deltaY;
-      if (Math.abs(wheelDeltaRef.current) < 24) return;
-      const direction = wheelDeltaRef.current > 0 ? 1 : -1;
-      wheelDeltaRef.current = 0;
-      const currentIndex = activeIndexRef.current;
-      const nextIndex = Math.max(0, Math.min(feed.length - 1, currentIndex + direction));
-      if (nextIndex === currentIndex) return;
-      const items = scroller.querySelectorAll<HTMLElement>("[data-feed-item]");
-      const target = items[nextIndex];
-      if (!target) return;
-      wheelLockRef.current = true;
-      activeIndexRef.current = nextIndex;
-      setActiveIndex(nextIndex);
-      scroller.scrollTo({ top: target.offsetTop, behavior: "smooth" });
-      unlockTimer = window.setTimeout(() => { wheelLockRef.current = false; }, 520);
+    let timer: number | undefined;
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || commentsTip) return;
+      e.preventDefault();
+      if (wheelLock.current) return;
+      wheelDelta.current += e.deltaY;
+      if (Math.abs(wheelDelta.current) < 24) return;
+      const dir = wheelDelta.current > 0 ? 1 : -1;
+      wheelDelta.current = 0;
+      const next = Math.max(0, Math.min(feed.length - 1, activeIndexRef.current + dir));
+      if (next === activeIndexRef.current) return;
+      wheelLock.current = true;
+      scrollTo(next);
+      timer = window.setTimeout(() => { wheelLock.current = false; }, 520);
     };
     scroller.addEventListener("wheel", onWheel, { passive: false });
-    return () => {
-      scroller.removeEventListener("wheel", onWheel);
-      if (unlockTimer) window.clearTimeout(unlockTimer);
-      wheelLockRef.current = false;
-      wheelDeltaRef.current = 0;
-    };
-  }, [commentsVideo, feed.length]);
+    return () => { scroller.removeEventListener("wheel", onWheel); if (timer) window.clearTimeout(timer); wheelLock.current = false; wheelDelta.current = 0; };
+  }, [commentsTip, feed.length, scrollTo]);
 
-  const activeTutorialId = feed[activeIndex]?.id;
-
+  const activeId = feed[activeIndex]?.id;
   useEffect(() => {
-    if (!activeTutorialId) return;
+    if (!activeId) return;
     const startedAt = Date.now();
-    addHistory(activeTutorialId);
-    recordVideoStart(activeTutorialId);
-    return () => {
-      if (Date.now() - startedAt < 2500) recordVideoSkip(activeTutorialId);
-    };
-  }, [activeTutorialId, addHistory, recordVideoSkip, recordVideoStart]);
+    addHistory(activeId);
+    recordVideoStart(activeId);
+    return () => { if (Date.now() - startedAt < 2500) recordVideoSkip(activeId); };
+  }, [activeId, addHistory, recordVideoSkip, recordVideoStart]);
 
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const tag = (event.target as HTMLElement)?.tagName;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || commentsVideo) return;
-      const key = event.key.toLowerCase();
+    const onKey = (e: KeyboardEvent) => {
+      if (["INPUT", "TEXTAREA", "SELECT"].includes((e.target as HTMLElement)?.tagName) || commentsTip) return;
+      const key = e.key.toLowerCase();
       const current = feed[activeIndex];
-      if (key === "s" && current) { event.preventDefault(); toggleSave(current.id); return; }
+      if (key === "s" && current) { e.preventDefault(); toggleSave(current.id); return; }
       if (key === "f" && current) { toggleFollowCreator(current.creatorId); return; }
-      const next = event.key === "ArrowDown" || key === "j";
-      const previous = event.key === "ArrowUp" || key === "k";
-      if (!next && !previous) return;
-      event.preventDefault();
-      scrollerRef.current?.scrollBy({ top: (next ? 1 : -1) * (scrollerRef.current?.clientHeight ?? 0), behavior: "smooth" });
+      if (e.key === "ArrowDown" || key === "j") { e.preventDefault(); scrollTo(Math.min(feed.length - 1, activeIndex + 1)); }
+      if (e.key === "ArrowUp" || key === "k") { e.preventDefault(); scrollTo(Math.max(0, activeIndex - 1)); }
     };
-    window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeIndex, commentsVideo, feed, toggleFollowCreator, toggleSave]);
-
-  const ambientGame = games.find((game) => game.id === feed[activeIndex]?.gameId);
-  const trending = useMemo(() => [...communityVideos].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || b.views - a.views).slice(0, 6), [communityVideos]);
-  const suggestedCreators = useMemo(() => {
-    const seen = new Map<string, FeedCreator>();
-    for (const tip of trending) { const c = creatorOf(tip); if (c && !followedCreators.includes(c.id) && !seen.has(c.id)) seen.set(c.id, c); }
-    return [...seen.values()];
-  }, [followedCreators, trending]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeIndex, commentsTip, feed, scrollTo, toggleFollowCreator, toggleSave]);
 
   return (
-    <div className="relative flex h-[100dvh] min-h-0 flex-1 flex-col overflow-hidden bg-[#07080b] pb-16 md:pb-0">
-      <div className="pointer-events-none absolute left-[28%] top-[18%] h-[520px] w-[520px] rounded-full opacity-[0.08] blur-[140px] transition-colors duration-700" style={{ background: ambientGame?.tint ?? "#7657ff" }} />
-      <header className="relative z-40 border-b border-white/[0.05] bg-[#090a0f]/88 backdrop-blur-2xl">
-        <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <select aria-label="Feed" value={tab} onChange={(event) => { setTab(event.target.value as FeedTab); resetFeed(); }} className="h-9 shrink-0 bg-transparent text-sm font-semibold outline-none md:hidden"><option value="foryou">For You</option><option value="following">Following</option><option value="explore">Explore</option></select>
-          <nav className="hidden h-full shrink-0 items-center gap-6 md:flex">{([ ["foryou", "For You"], ["following", "Following"], ["explore", "Explore"] ] as const).map(([id, label]) => <button key={id} type="button" onClick={() => { setTab(id); resetFeed(); }} className={cn("relative h-full text-sm font-semibold transition-colors", tab === id ? "text-white" : "text-muted hover:text-white")}>{label}{tab === id && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-accent" />}</button>)}</nav>
-          <DiscoverySearch />
+    <div className="relative h-full overflow-hidden bg-bg">
+      {/* tabs, TikTok-style */}
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center">
+        <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-white/10 bg-black/45 p-1 backdrop-blur-xl">
+          {([["following", "Following"], ["foryou", "For You"]] as const).map(([id, label]) => (
+            <button key={id} type="button" onClick={() => switchTab(id)} className={cn("h-8 rounded-full px-4 text-sm font-bold transition-colors", tab === id ? "bg-white text-black" : "text-white/70 hover:text-white")}>{label}</button>
+          ))}
         </div>
-        <div className="no-scrollbar mx-auto flex h-10 max-w-[1280px] items-center gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
-          <button type="button" onClick={resetFeed} className={cn("relative h-full shrink-0 px-3 text-xs font-semibold transition-colors", activeGames.length === 0 ? "text-white" : "text-muted hover:text-white")}>All{activeGames.length === 0 && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent" />}</button>
-          {availableGames.map((game) => <button type="button" key={game.id} onClick={() => toggleGameFilter(game.id)} aria-pressed={activeGames.includes(game.id)} className={cn("relative flex h-full shrink-0 items-center gap-1.5 px-3 text-xs font-semibold transition-colors", activeGames.includes(game.id) ? "text-white" : "text-muted hover:text-white")}><GameLogo game={game} size={15} />{game.short}{activeGames.includes(game.id) && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-accent" />}</button>)}
-          <Link href="/games" aria-label="Add game" className="ml-1 grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted hover:bg-white/[0.06] hover:text-white"><Plus className="h-3.5 w-3.5" /></Link>
-        </div>
-      </header>
-      <div ref={scrollerRef} className={cn("snap-feed no-scrollbar relative z-10 min-h-0 flex-1 overflow-y-auto transition-transform duration-200", commentsVideo && "2xl:-translate-x-24")}>
-        {feed.length ? feed.map((tutorial, index) => <FeedItem key={tutorial.id} tutorial={tutorial} nextTutorial={feed[index + 1] ?? feed[0]} trending={trending} suggestedCreators={suggestedCreators} active={activeIndex === index} onActivate={() => setActiveIndex(index)} onOpenComments={() => setCommentsVideo(tutorial)} />) : <div className="grid h-full place-items-center px-6 text-center"><div className="rounded-[28px] border border-white/[0.07] bg-white/[0.035] p-8"><Sparkles className="mx-auto h-7 w-7 text-accent" /><h2 className="mt-4 text-xl font-bold">Nothing in this lane yet</h2><p className="mt-2 text-sm text-muted">Switch games or open the wider discovery feed.</p><button type="button" onClick={() => { setTab("explore"); resetFeed(); }} className="mt-5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white">Open Discover</button></div></div>}
       </div>
-      <div className={cn("fixed inset-0 z-[70] transition", commentsVideo ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!commentsVideo}>
-        <button aria-label="Close comments" onClick={() => setCommentsVideo(null)} className={cn("absolute inset-0 bg-black/35 transition-opacity duration-200", commentsVideo ? "opacity-100" : "opacity-0")} />
-        <aside className={cn("absolute inset-y-0 right-0 w-full max-w-[430px] border-l border-white/[0.08] bg-[#0d0f14] shadow-2xl transition-transform duration-200", commentsVideo ? "translate-x-0" : "translate-x-full")}>
-          <div className="flex h-16 items-center justify-between border-b border-white/[0.07] px-5"><div><div className="font-semibold">Comments</div><div className="text-xs text-muted">{commentsVideo ? formatCount(commentsVideo.comments) : 0} conversations</div></div><button onClick={() => setCommentsVideo(null)} className="grid h-9 w-9 place-items-center rounded-xl text-muted hover:bg-hover hover:text-white"><X className="h-5 w-5" /></button></div>
-          <div className="h-[calc(100%-4rem)] overflow-y-auto p-5">{commentsVideo && <CommentThread tutorialId={commentsVideo.id} />}</div>
+
+      {/* up / down buttons on desktop */}
+      {feed.length > 1 && (
+        <div className="absolute right-6 top-1/2 z-30 hidden -translate-y-1/2 flex-col gap-2 lg:flex">
+          <button type="button" aria-label="Previous tip" disabled={activeIndex === 0} onClick={() => scrollTo(activeIndex - 1)} className={buttonClass("secondary", "icon", "rounded-full")}><ChevronUp className="h-5 w-5" /></button>
+          <button type="button" aria-label="Next tip" disabled={activeIndex >= feed.length - 1} onClick={() => scrollTo(activeIndex + 1)} className={buttonClass("secondary", "icon", "rounded-full")}><ChevronDown className="h-5 w-5" /></button>
+        </div>
+      )}
+
+      <div ref={scrollerRef} className="snap-feed no-scrollbar h-full overflow-y-auto">
+        {loading && feed.length === 0 ? (
+          <div className="flex h-full items-center justify-center"><div className="shimmer aspect-[9/16] h-[80%] rounded-[28px]" /></div>
+        ) : feed.length ? (
+          feed.map((tip, index) => <FeedItem key={tip.id} tip={tip} active={activeIndex === index} onActivate={() => setActiveIndex(index)} onOpenComments={() => setCommentsTip(tip)} />)
+        ) : (
+          <div className="grid h-full place-items-center px-6 text-center">
+            <div className="max-w-sm rounded-3xl border border-white/[0.07] bg-panel p-8">
+              <Sparkles className="mx-auto h-7 w-7 text-accent" />
+              <h2 className="display mt-4 text-2xl font-bold">{tab === "following" ? (isLoggedIn ? "Nothing from people you follow yet" : "Sign in to follow creators") : "No tips yet"}</h2>
+              <p className="mt-2 text-sm text-muted">{tab === "following" ? "Follow creators from any tip and their uploads show up here." : "Upload the first one from Creator Studio."}</p>
+              <button type="button" onClick={() => switchTab("foryou")} className={buttonClass("primary", "md", "mt-5")}>Back to For You</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* comments drawer */}
+      <div className={cn("fixed inset-0 z-[70] transition", commentsTip ? "pointer-events-auto" : "pointer-events-none")} aria-hidden={!commentsTip}>
+        <button aria-label="Close comments" onClick={() => setCommentsTip(null)} className={cn("absolute inset-0 bg-black/50 transition-opacity", commentsTip ? "opacity-100" : "opacity-0")} />
+        <aside className={cn("absolute inset-x-0 bottom-0 h-[75dvh] rounded-t-3xl border-t border-white/[0.08] bg-panel shadow-2xl transition-transform duration-200 md:inset-y-0 md:left-auto md:right-0 md:h-full md:w-[420px] md:rounded-none md:border-l md:border-t-0", commentsTip ? "translate-y-0 md:translate-x-0" : "translate-y-full md:translate-x-full md:translate-y-0")}>
+          <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-5">
+            <div className="font-semibold">{commentsTip ? formatCount(commentsTip.comments) : 0} comments</div>
+            <button type="button" onClick={() => setCommentsTip(null)} className="grid h-9 w-9 place-items-center rounded-xl text-muted hover:bg-white/[0.06] hover:text-white"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="h-[calc(100%-3.5rem)] overflow-y-auto p-5">{commentsTip && <CommentThread tutorialId={commentsTip.id} />}</div>
         </aside>
       </div>
     </div>

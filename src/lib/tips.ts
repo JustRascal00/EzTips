@@ -225,6 +225,22 @@ export async function getProfilesByIds(client: SupabaseClient, ids: string[]) {
   return valid.map((id) => byId.get(id)).filter((p): p is CreatorSummary & { follower_count: number } => Boolean(p));
 }
 
+/** Tip count per champion (public League tips). */
+export async function championTipCounts(client: SupabaseClient) {
+  const { data, error } = await client
+    .from("videos")
+    .select("champion_id")
+    .eq("status", "published")
+    .eq("visibility", "public")
+    .in("game_id", [...ENABLED_GAME_IDS])
+    .not("champion_id", "is", null)
+    .limit(5000);
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as { champion_id: string }[]) counts[row.champion_id] = (counts[row.champion_id] ?? 0) + 1;
+  return counts;
+}
+
 export async function getCurrentPatch(client: SupabaseClient) {
   const { data } = await client.from("patches").select("id,version,ddragon_version").eq("is_current", true).maybeSingle();
   return (data ?? null) as { id: number; version: string; ddragon_version: string } | null;

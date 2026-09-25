@@ -16,26 +16,67 @@ export function Button({
   className,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "success";
-  size?: "sm" | "md" | "lg";
+  variant?: "primary" | "secondary" | "ghost" | "outline" | "danger" | "success";
+  size?: "sm" | "md" | "lg" | "icon";
+}) {
+  return <button className={buttonClass(variant, size, className)} {...props} />;
+}
+
+/** Shared button look, also for <Link>s that should look like buttons. */
+export function buttonClass(
+  variant: "primary" | "secondary" | "ghost" | "outline" | "danger" | "success" = "primary",
+  size: "sm" | "md" | "lg" | "icon" = "md",
+  className?: string,
+) {
+  return cn(
+    "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:pointer-events-none disabled:opacity-45",
+    size === "sm" && "h-8 rounded-lg px-3 text-[13px]",
+    size === "md" && "h-10 rounded-xl px-4 text-sm",
+    size === "lg" && "h-12 rounded-xl px-5 text-[15px]",
+    size === "icon" && "h-10 w-10 rounded-xl",
+    variant === "primary" && "bg-accent text-white shadow-[0_6px_20px_-8px_rgba(118,87,255,0.8)] hover:bg-accent-hover",
+    variant === "secondary" && "border border-white/[0.08] bg-white/[0.05] text-text hover:border-white/[0.14] hover:bg-white/[0.09]",
+    variant === "outline" && "border border-border bg-transparent text-text hover:border-accent/50 hover:bg-accent/10",
+    variant === "ghost" && "text-muted hover:bg-white/[0.06] hover:text-text",
+    variant === "danger" && "bg-danger/15 text-danger hover:bg-danger/25",
+    variant === "success" && "bg-success/15 text-success hover:bg-success/25",
+    className,
+  );
+}
+
+/** Pill-style segmented control (Top / New, class filters, ...). */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+  size = "md",
+}: {
+  options: { id: T; label: ReactNode }[];
+  value: T;
+  onChange: (id: T) => void;
+  className?: string;
+  size?: "sm" | "md";
 }) {
   return (
-    <button
-      className={cn(
-        "inline-flex items-center justify-center gap-2 font-medium transition-colors duration-200 disabled:opacity-50 disabled:pointer-events-none",
-        size === "sm" && "h-8 px-3 text-sm rounded-[10px]",
-        size === "md" && "h-10 px-4 text-sm rounded-xl",
-        size === "lg" && "h-12 px-5 text-[15px] rounded-xl",
-        variant === "primary" && "bg-accent text-white hover:bg-accent-hover",
-        variant === "secondary" &&
-          "bg-card text-text border border-border hover:bg-hover",
-        variant === "ghost" && "text-muted hover:text-text hover:bg-hover",
-        variant === "danger" && "bg-danger/15 text-danger hover:bg-danger/25",
-        variant === "success" && "bg-success/15 text-success hover:bg-success/25",
-        className,
-      )}
-      {...props}
-    />
+    <div className={cn("inline-flex items-center gap-0.5 rounded-xl border border-white/[0.06] bg-white/[0.03] p-1", className)} role="tablist">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          role="tab"
+          aria-selected={value === option.id}
+          onClick={() => onChange(option.id)}
+          className={cn(
+            "inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg font-semibold transition-colors",
+            size === "sm" ? "h-7 px-2.5 text-xs" : "h-8 px-3 text-[13px]",
+            value === option.id ? "bg-white/[0.1] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]" : "text-muted hover:text-text",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -64,26 +105,30 @@ export function Tabs({
   onChange,
   className,
 }: {
-  tabs: { id: string; label: string }[];
+  tabs: { id: string; label: ReactNode; count?: number }[];
   value: string;
   onChange: (id: string) => void;
   className?: string;
 }) {
   return (
-    <div className={cn("flex gap-1 border-b border-border", className)}>
+    <div className={cn("no-scrollbar flex gap-6 overflow-x-auto border-b border-line", className)} role="tablist">
       {tabs.map((t) => (
         <button
           key={t.id}
+          type="button"
+          role="tab"
+          aria-selected={value === t.id}
           onClick={() => onChange(t.id)}
           className={cn(
-            "relative px-4 py-3 text-sm font-medium transition-colors duration-200",
-            value === t.id ? "text-text" : "text-muted hover:text-text",
+            "relative flex h-12 shrink-0 items-center gap-2 text-sm font-semibold transition-colors",
+            value === t.id ? "text-white" : "text-muted hover:text-text",
           )}
         >
           {t.label}
-          {value === t.id && (
-            <span className="absolute left-4 right-4 -bottom-px h-0.5 rounded-full bg-accent" />
+          {typeof t.count === "number" && (
+            <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] tabular", value === t.id ? "bg-accent/20 text-accent" : "bg-white/[0.06] text-muted")}>{t.count}</span>
           )}
+          {value === t.id && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-accent shadow-[0_0_12px_#7657ff]" />}
         </button>
       ))}
     </div>
@@ -140,14 +185,14 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <button
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close"
       />
       <div
         className={cn(
-          "relative w-full rounded-2xl border border-border bg-elevated p-5 fade-up",
-          wide ? "max-w-2xl" : "max-w-md",
+          "relative max-h-[88dvh] w-full overflow-y-auto rounded-2xl border border-white/[0.08] bg-panel p-5 shadow-2xl shadow-black/60 fade-up",
+          wide ? "max-w-3xl" : "max-w-md",
         )}
       >
         {title && <h3 className="text-lg font-semibold mb-3">{title}</h3>}
@@ -229,8 +274,10 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center text-center py-16 px-6">
-      <div className="h-12 w-12 rounded-2xl border border-border bg-card mb-4" />
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/[0.08] px-6 py-14 text-center">
+      <div className="mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-accent/10 text-accent">
+        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></svg>
+      </div>
       <h3 className="text-lg font-semibold">{title}</h3>
       <p className="text-muted text-sm mt-1 max-w-sm">{body}</p>
       {action && <div className="mt-5">{action}</div>}
@@ -311,10 +358,10 @@ export function Chip({
     <Comp
       onClick={onClick}
       className={cn(
-        "inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium border transition-colors duration-150",
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border transition-colors duration-150",
         active
-          ? "bg-accent/15 text-text border-accent/40"
-          : "bg-card text-muted border-border",
+          ? "bg-accent/15 text-white border-accent/40"
+          : "bg-white/[0.04] text-muted border-white/[0.07]",
         onClick && "hover:bg-hover hover:text-text",
       )}
     >
@@ -342,7 +389,7 @@ export function FilterSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-9 rounded-[10px] bg-card border border-border px-2 text-sm text-text outline-none focus:border-accent/50"
+        className="h-10 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-medium text-text outline-none transition-colors hover:border-white/[0.14] focus:border-accent/60"
       >
         {options.map((o) => (
           <option key={o.id} value={o.id}>

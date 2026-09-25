@@ -44,9 +44,9 @@ export function SearchBar({
         value={q}
         onChange={(e) => setQ(e.target.value)}
         autoFocus={autoFocus}
-        placeholder="Search games, creators, champions, agents, mechanics..."
+        placeholder="Search tips: champion, mechanic, matchup…"
         className={cn(
-          "w-full bg-card border border-border text-text placeholder:text-muted outline-none focus:border-accent/50 transition-colors duration-200",
+          "w-full border border-white/[0.08] bg-white/[0.04] text-text placeholder:text-muted outline-none focus:border-accent/60 transition-colors duration-200",
           large
             ? "h-14 rounded-2xl pl-12 pr-4 text-[15px]"
             : "h-10 rounded-xl pl-10 pr-3 text-sm",

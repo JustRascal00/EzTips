@@ -13,7 +13,7 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="px-6 py-8 max-w-xl">
+      <div className="py-8 max-w-xl">
         <h1 className="text-3xl font-bold">Settings</h1>
         <section className="mt-8 rounded-2xl border border-border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Account</h2>

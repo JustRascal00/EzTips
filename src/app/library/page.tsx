@@ -1,6 +1,6 @@
 "use client";
 
-import { TutorialCard } from "@/components/cards";
+import { TipGrid } from "@/components/league";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button, EmptyState, Tabs } from "@/components/ui";
 import { useApp } from "@/lib/store";
@@ -25,14 +25,14 @@ export default function LibraryPage() {
 
   return (
     <AppShell>
-      <div className="px-6 py-8 max-w-5xl">
-        <h1 className="text-3xl font-bold">Saved</h1>
-        <p className="text-muted mt-1">Keep useful clips organized for your next queue.</p>
+      <div className="py-8">
+        <h1 className="display text-4xl font-extrabold">Your library</h1>
+        <p className="text-muted mt-1">Tips you saved, upvoted or watched.</p>
         <Tabs
           className="mt-6"
           tabs={[
-            { id: "saved", label: "Saved Clips" },
-            { id: "liked", label: "Liked" },
+            { id: "saved", label: "Saved", count: savedList.length },
+            { id: "liked", label: "Upvoted", count: likedList.length },
             { id: "history", label: "History" },
           ]}
           value={tab}
@@ -52,29 +52,17 @@ export default function LibraryPage() {
                 }
               />
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {savedList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)}
-              </div>
+              <TipGrid tips={savedList as Tutorial[]} />
             )}
           </div>
         )}
 
         {tab === "liked" && (
-          <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {likedList.length === 0 ? (
-              <div className="col-span-full">
-                <EmptyState title="No liked clips" body="Like a clip and it will land here." />
-              </div>
-            ) : (
-              likedList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)
-            )}
-          </div>
+          <div className="mt-6"><TipGrid tips={likedList as Tutorial[]} empty={<EmptyState title="No upvoted tips yet" body="Upvote a tip and it lands here." />} /></div>
         )}
 
         {tab === "history" && (
-          <div className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {histList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)}
-          </div>
+          <div className="mt-6"><TipGrid tips={histList as Tutorial[]} empty={<EmptyState title="Nothing watched yet" body="Tips you open show up here." />} /></div>
         )}
       </div>
     </AppShell>

@@ -1,165 +1,127 @@
 "use client";
 
+import { CoachChat } from "@/components/coach/CoachChat";
 import { AppShell } from "@/components/layout/AppShell";
-import { useAuth } from "@/lib/auth";
-import { cn } from "@/lib/cn";
-import { championIconUrl, itemIconUrl } from "@/lib/ddragon/shared";
-import { AlertTriangle, LoaderCircle, SendHorizontal, Sparkles } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { ChampionPicker, ChampionSlot } from "@/components/league";
+import { buttonClass } from "@/components/ui";
+import { ROLE_LABEL, ROLES } from "@/lib/league";
+import { useCurrentPatch } from "@/lib/use-tips";
+import { Crown, Hammer, RotateCcw, Sparkles } from "lucide-react";
+import { useState } from "react";
 
-type Ref = { id: string; name: string };
-type CoachReply = {
-  answer: string;
-  items: Ref[];
-  champions: Ref[];
-  runes: string[];
-  unverified: string[];
-  patch: string;
-  version: string;
-  model: string;
-  usedFallback: boolean;
-  remaining?: number;
-};
-type Message =
-  | { role: "user"; text: string }
-  | { role: "model"; text: string; reply: CoachReply }
-  | { role: "error"; text: string };
-
-const suggestions = [
-  "I'm playing Ahri mid into Zed. What should I build first?",
-  "Enemy has 2 tanks and a Vayne. What should Jinx build?",
-  "Best runes for Lee Sin jungle this patch?",
-];
+type Pick = { id: string; name: string } | null;
+type Target = { kind: "me" } | { kind: "enemy"; index: number } | null;
 
 export default function CoachPage() {
-  const { configured, loading, user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const { patch } = useCurrentPatch();
+  const [me, setMe] = useState<Pick>(null);
+  const [role, setRole] = useState<string>("mid");
+  const [enemies, setEnemies] = useState<Pick[]>([null, null, null, null, null]);
+  const [target, setTarget] = useState<Target>(null);
+  const [inject, setInject] = useState<{ id: number; text: string; label: string } | null>(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  const picked = enemies.filter((e): e is NonNullable<Pick> => Boolean(e));
+  const taken = [me?.id, ...picked.map((e) => e.id)].filter(Boolean) as string[];
+  const enemyList = picked.map((e) => e.name).join(", ");
 
-  async function send(text: string) {
-    const message = text.trim();
-    if (!message || sending) return;
-    const history = messages
-      .filter((m): m is Extract<Message, { role: "user" | "model" }> => m.role === "user" || m.role === "model")
-      .map((m) => ({ role: m.role, text: m.role === "model" ? JSON.stringify({ answer: m.text }) : m.text }));
-    setMessages((current) => [...current, { role: "user", text: message }]);
-    setInput("");
-    setSending(true);
-    try {
-      const res = await fetch("/api/coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
+  function ask(kind: "build" | "counter") {
+    if (kind === "build" && me) {
+      setInject({
+        id: Date.now(),
+        label: `Build for ${me.name} ${ROLE_LABEL[role]} vs ${enemyList}`,
+        text: `Draft: I'm playing ${me.name} ${ROLE_LABEL[role]}. Enemy team: ${enemyList}. Suggest my items (starting item, core items in buy order, and 1-2 situational items), my runes and summoner spells against this exact comp. Give a short reason for each choice.`,
       });
-      const data = await res.json().catch(() => ({ error: `Request failed (${res.status})` }));
-      if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-      setMessages((current) => [...current, { role: "model", text: data.answer, reply: data as CoachReply }]);
-    } catch (error) {
-      setMessages((current) => [...current, { role: "error", text: error instanceof Error ? error.message : "Something went wrong." }]);
-    } finally {
-      setSending(false);
     }
+    if (kind === "counter") {
+      setInject({
+        id: Date.now(),
+        label: `Best ${ROLE_LABEL[role]} picks vs ${enemyList}`,
+        text: `Draft: I'm ${ROLE_LABEL[role]}. Enemy team: ${enemyList}. Suggest the 3 best champions for my role against this comp, best first, with a short reason for each (put them in "champions").`,
+      });
+    }
+    window.setTimeout(() => document.getElementById("coach-chat")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   }
 
-  const signedOut = configured && !loading && !user;
-
   return (
-    <AppShell hideRight>
-      <div className="mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-3xl flex-col px-4 pb-24 pt-6 md:pb-8">
-        <header className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent/15 text-accent"><Sparkles className="h-5 w-5" /></span>
+    <AppShell publicPage>
+      <div className="mx-auto max-w-4xl pt-6 sm:pt-10">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold">Ask the coach</h1>
-            <p className="text-sm text-muted">Builds, runes and matchups, grounded in the current patch.</p>
+            <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent"><Sparkles className="h-4 w-4" />AI coach</span>
+            <h1 className="display mt-1 text-4xl font-extrabold sm:text-5xl">Draft board</h1>
+            <p className="mt-1 text-sm text-muted">Fill in the enemy team. Get a build for this exact comp, or the best picks for your role.</p>
           </div>
-        </header>
+          <span className="rounded-lg border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-bold text-accent">Patch {patch ?? "…"}</span>
+        </div>
 
-        {signedOut ? (
-          <div className="mt-10 rounded-2xl border border-border bg-card p-6 text-center">
-            <p className="font-semibold">Sign in to use the coach</p>
-            <Link href="/auth?next=/coach" className="mt-4 inline-flex h-10 items-center rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover">Sign in</Link>
-          </div>
-        ) : (
-          <>
-            <div className="mt-6 flex-1 space-y-4">
-              {messages.length === 0 && (
-                <div className="grid gap-2">
-                  {suggestions.map((s) => (
-                    <button key={s} type="button" onClick={() => send(s)} className="rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-muted transition-colors hover:bg-hover hover:text-text">{s}</button>
-                  ))}
-                </div>
-              )}
-
-              {messages.map((m, i) => {
-                if (m.role === "user") {
-                  return <div key={i} className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-sm text-white">{m.text}</div>;
-                }
-                if (m.role === "error") {
-                  return <div key={i} className="flex max-w-[85%] items-start gap-2 rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-red-200"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />{m.text}</div>;
-                }
-                const r = m.reply;
-                return (
-                  <div key={i} className="max-w-[92%] rounded-2xl rounded-bl-md border border-border bg-card p-4">
-                    <p className="whitespace-pre-wrap text-sm leading-6">{r.answer}</p>
-                    {r.champions.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {r.champions.map((c) => (
-                          <span key={c.id} className="inline-flex items-center gap-1.5 rounded-lg bg-elevated py-1 pl-1 pr-2 text-xs">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={championIconUrl(r.version, c.id)} alt="" className="h-5 w-5 rounded" />{c.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {r.items.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {r.items.map((item) => (
-                          <span key={item.id} className="inline-flex items-center gap-1.5 rounded-lg bg-elevated py-1 pl-1 pr-2 text-xs">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={itemIconUrl(r.version, item.id)} alt="" className="h-5 w-5 rounded" />{item.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {r.runes.length > 0 && <p className="mt-3 text-xs text-muted">Runes: {r.runes.join(" · ")}</p>}
-                    {r.unverified.length > 0 && <p className="mt-2 text-xs text-amber-300/80">Not found in this patch&apos;s data (ignore): {r.unverified.join(", ")}</p>}
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted">
-                      <span className="rounded-md bg-accent/15 px-1.5 py-0.5 font-semibold text-accent">Based on patch {r.patch}</span>
-                      <span>{r.model}{r.usedFallback ? " (fallback)" : ""}</span>
-                      {typeof r.remaining === "number" && <span>· {r.remaining} questions left today</span>}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {sending && <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted"><LoaderCircle className="h-4 w-4 animate-spin" />Thinking…</div>}
-              <div ref={bottomRef} />
+        {/* ── Board ─────────────────────────────── */}
+        <section className="relative mt-6 overflow-hidden rounded-3xl border border-white/[0.07] bg-panel">
+          <div className="absolute inset-0 bg-grid opacity-50" />
+          <div className="relative grid gap-6 p-5 sm:p-7 md:grid-cols-[220px_1fr]">
+            <div className="rounded-2xl border border-accent/25 bg-accent/[0.06] p-4">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-accent"><Crown className="h-3.5 w-3.5" />You</div>
+              <div className="mt-3 flex justify-center">
+                <ChampionSlot id={me?.id} name={me?.name} size={84} highlight label="Your champion" onClick={() => setTarget({ kind: "me" })} onClear={() => setMe(null)} />
+              </div>
+              <div className="mt-4 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Role</div>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                {ROLES.map((r) => (
+                  <button key={r.id} type="button" onClick={() => setRole(r.id)} className={`h-8 rounded-lg text-xs font-bold transition-colors ${role === r.id ? "bg-accent text-white" : "bg-white/[0.04] text-muted hover:text-white"}`}>{r.label}</button>
+                ))}
+              </div>
             </div>
 
-            <form
-              onSubmit={(e) => { e.preventDefault(); void send(input); }}
-              className="sticky bottom-20 mt-6 flex gap-2 rounded-2xl border border-border bg-elevated p-2 md:bottom-4"
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                maxLength={1000}
-                placeholder="What if they have 2 tanks?"
-                className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted/70"
-              />
-              <button type="submit" disabled={sending || !input.trim()} aria-label="Send" className={cn("grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent text-white transition-opacity hover:bg-accent-hover", (sending || !input.trim()) && "opacity-40")}>
-                <SendHorizontal className="h-4 w-4" />
-              </button>
-            </form>
-          </>
-        )}
+            <div>
+              <div className="flex items-center justify-between">
+                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-danger">Enemy team</div>
+                {picked.length > 0 && <button type="button" onClick={() => setEnemies([null, null, null, null, null])} className="inline-flex items-center gap-1 text-xs font-semibold text-muted hover:text-white"><RotateCcw className="h-3 w-3" />Reset</button>}
+              </div>
+              <div className="mt-4 grid grid-cols-5 gap-2 sm:gap-4">
+                {enemies.map((e, i) => (
+                  <ChampionSlot key={i} id={e?.id} name={e?.name} size={64} label={`Enemy ${i + 1}`} onClick={() => setTarget({ kind: "enemy", index: i })} onClear={() => setEnemies((cur) => cur.map((x, n) => (n === i ? null : x)))} />
+                ))}
+              </div>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <button type="button" disabled={!me || picked.length === 0} onClick={() => ask("build")} className={buttonClass("primary", "lg", "flex-1")}>
+                  <Hammer className="h-4 w-4" />{me ? `Build ${me.name} vs this comp` : "Pick your champion first"}
+                </button>
+                <button type="button" disabled={picked.length === 0} onClick={() => ask("counter")} className={buttonClass("secondary", "lg", "flex-1")}>
+                  <Sparkles className="h-4 w-4" />Best {ROLE_LABEL[role]} picks
+                </button>
+              </div>
+              {picked.length === 0 && <p className="mt-3 text-xs text-muted">Add at least one enemy champion to get suggestions.</p>}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Chat ──────────────────────────────── */}
+        <section id="coach-chat" className="mt-8 scroll-mt-20">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="display text-2xl font-bold">Ask anything</h2>
+            <span className="text-xs text-muted">Uses current patch data, never invents items</span>
+          </div>
+          <CoachChat
+            inject={inject}
+            suggestions={[
+              "I'm playing Ahri mid into Zed. What should I build first?",
+              "Enemy has 2 tanks and a Vayne. What should Jinx build?",
+              "Best runes for Lee Sin jungle this patch?",
+            ]}
+          />
+        </section>
+
+        <ChampionPicker
+          open={target !== null}
+          onClose={() => setTarget(null)}
+          title={target?.kind === "me" ? "Your champion" : "Enemy champion"}
+          disabledIds={taken}
+          onPick={(c) => {
+            const pick = { id: c.id, name: c.name };
+            if (target?.kind === "me") setMe(pick);
+            if (target?.kind === "enemy") setEnemies((cur) => cur.map((x, n) => (n === target.index ? pick : x)));
+            setTarget(null);
+          }}
+        />
       </div>
     </AppShell>
   );

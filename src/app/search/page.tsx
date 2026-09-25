@@ -1,9 +1,10 @@
 "use client";
 
-import { ProfileCard, TutorialCard } from "@/components/cards";
+import { ProfileCard } from "@/components/cards";
+import { TipGrid } from "@/components/league";
 import { AppShell } from "@/components/layout/AppShell";
 import { SearchBar } from "@/components/SearchBar";
-import { EmptyState, FilterSelect, Skeleton } from "@/components/ui";
+import { EmptyState, FilterSelect } from "@/components/ui";
 import { championIconUrl } from "@/lib/ddragon/shared";
 import { searchCreators, searchTips, type CreatorSummary } from "@/lib/tips";
 import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
@@ -38,9 +39,9 @@ function Results() {
   const empty = q && !loading && tips.length === 0 && creators.length === 0 && matchingChampions.length === 0;
 
   return (
-    <div className="px-4 py-8 max-w-5xl sm:px-6">
-      <h1 className="text-3xl font-bold">Search</h1>
-      <SearchBar large className="mt-4" initial={q} autoFocus />
+    <div className="py-8">
+      <h1 className="display text-4xl font-extrabold">{q ? <>Results for <span className="text-accent">“{q}”</span></> : "Search"}</h1>
+      <SearchBar large className="mt-4 max-w-2xl" initial={q} key={q} />
       <div className="flex flex-wrap gap-3 mt-4">
         <FilterSelect
           label="Role"
@@ -72,10 +73,10 @@ function Results() {
 
       {matchingChampions.length > 0 && (
         <section className="mt-8">
-          <h2 className="text-lg font-semibold mb-3">Champions</h2>
+          <h2 className="display text-2xl font-bold mb-3">Champions</h2>
           <div className="flex gap-3 flex-wrap">
             {matchingChampions.map((c) => (
-              <Link key={c.id} href={`/search?q=${encodeURIComponent(c.name)}`} className="w-20 text-center">
+              <Link key={c.id} href={`/champions/${c.id}`} className="w-20 text-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={championIconUrl(ddragonVersion, c.id)} alt="" className="h-20 w-20 rounded-2xl object-cover border border-border" />
                 <div className="text-sm mt-1 font-medium truncate">{c.name}</div>
@@ -85,24 +86,16 @@ function Results() {
         </section>
       )}
 
-      {q && loading && (
-        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="aspect-[16/10] rounded-2xl" />)}
-        </div>
-      )}
-
-      {tips.length > 0 && (
+      {q && (loading || tips.length > 0) && (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Tips</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tips.map((t) => <TutorialCard key={t.id} tutorial={t} />)}
-          </div>
+          <h2 className="display text-2xl font-bold mb-3">Tips</h2>
+          <TipGrid tips={tips} loading={loading} />
         </section>
       )}
 
       {creators.length > 0 && (
         <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Creators</h2>
+          <h2 className="display text-2xl font-bold mb-3">Creators</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             {creators.map((c) => <ProfileCard key={c.id} profile={c} />)}
           </div>

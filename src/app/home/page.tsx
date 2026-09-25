@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/AppShell";
 
 export default function HomePage() {
   return (
-    <AppShell hideRight fullBleed hideHeader>
+    <AppShell publicPage fullBleed>
       <HomeFeed />
     </AppShell>
   );

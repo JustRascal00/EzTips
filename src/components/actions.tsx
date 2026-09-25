@@ -3,6 +3,7 @@
 import { AlertTriangle, ArrowBigDown, ArrowBigUp, Bookmark, Check, X } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/lib/store";
+import { buttonClass } from "./ui";
 import { cn } from "@/lib/cn";
 import { Tooltip } from "./ui";
 
@@ -15,32 +16,22 @@ export function SaveControl({
 }) {
   const { saved, toggleSave } = useApp();
   const on = saved.includes(tutorialId);
-
+  if (vertical) {
+    return (
+      <button type="button" onClick={() => toggleSave(tutorialId)} aria-label={on ? "Saved" : "Save"} aria-pressed={on} className="group flex flex-col items-center gap-1 text-[11px] font-bold text-white/80">
+        <span className={cn("grid h-11 w-11 place-items-center rounded-full border backdrop-blur-md transition", on ? "border-accent/60 bg-accent/25 text-accent" : "border-white/10 bg-black/45 group-hover:bg-white/15 md:bg-white/[0.07]")}>
+          <Bookmark className={cn("h-5 w-5", on && "fill-current")} />
+        </span>
+        {on ? "Saved" : "Save"}
+      </button>
+    );
+  }
   return (
-    <>
-      <Tooltip label={on ? "Saved" : "Save"}>
-        <button
-          onClick={() => toggleSave(tutorialId)}
-          className={cn(
-            "flex items-center gap-2 transition-colors duration-200",
-            vertical ? "flex-col text-xs text-muted" : "text-muted hover:text-text",
-            on && "text-xp",
-          )}
-          aria-label="Save"
-        >
-          <span
-            className={cn(
-              "grid place-items-center rounded-full border border-border bg-card transition-all duration-200",
-              vertical ? "h-11 w-11" : "h-9 w-9",
-              on && "border-xp/40 bg-xp/10",
-            )}
-          >
-            <Bookmark className={cn("h-4 w-4", on && "fill-current")} />
-          </span>
-          {vertical && "Save"}
-        </button>
-      </Tooltip>
-    </>
+    <Tooltip label={on ? "Saved" : "Save"}>
+      <button type="button" onClick={() => toggleSave(tutorialId)} aria-label="Save" aria-pressed={on} className={buttonClass(on ? "outline" : "secondary", "icon", on ? "border-accent/60 text-accent" : undefined)}>
+        <Bookmark className={cn("h-4 w-4", on && "fill-current")} />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -51,18 +42,14 @@ export function FollowButton({
   creatorId: string;
   size?: "sm" | "md";
 }) {
-  const { followedCreators, toggleFollowCreator } = useApp();
+  const { followedCreators, toggleFollowCreator, currentUser, isLoggedIn } = useApp();
+  if (isLoggedIn && currentUser.id === creatorId) return null;
   const on = followedCreators.includes(creatorId);
   return (
     <button
+      type="button"
       onClick={() => toggleFollowCreator(creatorId)}
-      className={cn(
-        "rounded-xl font-medium transition-all duration-200",
-        size === "sm" ? "h-8 px-3 text-sm" : "h-10 px-4 text-sm",
-        on
-          ? "bg-card border border-border text-muted hover:text-danger hover:border-danger/40"
-          : "bg-accent text-white hover:bg-accent-hover",
-      )}
+      className={buttonClass(on ? "secondary" : "primary", size === "sm" ? "sm" : "md", on ? "text-muted hover:border-danger/40 hover:text-danger" : undefined)}
     >
       {on ? "Following" : "Follow"}
     </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { FollowButton } from "@/components/actions";
-import { TutorialCard } from "@/components/cards";
+import { TipGrid } from "@/components/league";
 import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/ui";
 import { formatCount } from "@/lib/format";
@@ -19,8 +19,8 @@ export default function FollowingPage() {
 
   return (
     <AppShell>
-      <div className="px-4 py-8 max-w-5xl sm:px-6">
-        <h1 className="text-3xl font-bold">Following</h1>
+      <div className="py-8">
+        <h1 className="display text-4xl font-extrabold">Following</h1>
         <p className="text-muted mt-1">Creators you trust. Their new tips land here first.</p>
         {followedCreators.length === 0 ? (
           <div className="mt-6">
@@ -43,13 +43,11 @@ export default function FollowingPage() {
                 </div>
               ))}
             </div>
-            <h2 className="text-lg font-semibold mt-10 mb-3">Latest from people you follow</h2>
+            <h2 className="display text-2xl font-bold mt-10 mb-3">Latest from people you follow</h2>
             {feed.length === 0 ? (
               <p className="text-sm text-muted">No tips from them yet.</p>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {feed.map((t) => <TutorialCard key={t.id} tutorial={t} />)}
-              </div>
+              <TipGrid tips={feed} />
             )}
           </>
         )}

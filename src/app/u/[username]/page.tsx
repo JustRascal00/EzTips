@@ -16,7 +16,7 @@ export default function UserProfilePage() {
 
   return (
     <AppShell>
-      <div className="px-6 py-8 max-w-4xl">
+      <div className="py-8 max-w-4xl">
         <div className="flex gap-5 items-start">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={user.avatar} alt="" className="h-24 w-24 rounded-full border border-border" />
