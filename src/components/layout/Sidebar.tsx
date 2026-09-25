@@ -8,9 +8,9 @@ import {
   Bell,
   Bookmark,
   Compass,
-  Gamepad2,
   Home,
   Settings,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
@@ -22,7 +22,7 @@ import { GameLogo } from "../GameLogo";
 const nav = (loggedIn: boolean, username: string) => [
   { href: loggedIn ? "/home" : "/", label: "Home", icon: Home },
   { href: "/explore", label: "Explore", icon: Compass },
-  { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/coach", label: "Coach", icon: Sparkles },
   { href: "/library", label: "Saved", icon: Bookmark },
   { href: `/u/${username}`, label: "Profile", icon: UserRound },
 ];
@@ -141,7 +141,7 @@ export function MobileNav() {
   const items = [
     { href: "/home", label: "Home", icon: Home },
     { href: "/explore", label: "Explore", icon: Compass },
-    { href: "/games", label: "Games", icon: Gamepad2 },
+    { href: "/coach", label: "Coach", icon: Sparkles },
     { href: "/library", label: "Saved", icon: Bookmark },
     { href: `/u/${currentUser.username}`, label: "Profile", icon: UserRound },
   ];
