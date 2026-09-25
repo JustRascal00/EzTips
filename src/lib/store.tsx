@@ -133,7 +133,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Persist>(defaults);
   const [hydrated, setHydrated] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [xpBurst, setXpBurst] = useState<number | null>(null);
+  const [xpBurst] = useState<number | null>(null); // XP hidden for now
   const [backendGames, setBackendGames] = useState<string[] | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -173,15 +173,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
-  const addXp = useCallback(
-    (amount: number, reason?: string) => {
-      setState((s) => ({ ...s, xp: s.xp + amount }));
-      setXpBurst(amount);
-      setTimeout(() => setXpBurst(null), 900);
-      if (reason) toast(reason);
-    },
-    [toast],
-  );
+  // XP / levels are hidden for now: keep the API so callers still compile, but do nothing.
+  const addXp = useCallback((amount: number, reason?: string) => {
+    void amount;
+    void reason;
+  }, []);
 
   const completeOnboarding = useCallback(async (games: string[]) => {
     setBackendGames(games);

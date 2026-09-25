@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { safeNextPath } from "@/lib/safe-redirect";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const requestedNext = url.searchParams.get("next") || "/onboarding";
-  const next = requestedNext.startsWith("/") ? requestedNext : "/onboarding";
+  const next = safeNextPath(url.searchParams.get("next"), "/onboarding");
   if (code) {
     const supabase = await createClient();
     if (supabase) {

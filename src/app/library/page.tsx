@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 export default function LibraryPage() {
-  const { saved, liked, history, collections } = useApp();
+  const { saved, liked, history } = useApp();
   const [tab, setTab] = useState("saved");
 
   const byIds = (ids: string[]) =>
@@ -28,7 +28,6 @@ export default function LibraryPage() {
           className="mt-6"
           tabs={[
             { id: "saved", label: "Saved Clips" },
-            { id: "collections", label: "Collections" },
             { id: "liked", label: "Liked" },
             { id: "history", label: "History" },
           ]}
@@ -53,34 +52,6 @@ export default function LibraryPage() {
                 {savedList.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)}
               </div>
             )}
-          </div>
-        )}
-
-        {tab === "collections" && (
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold mb-3">My Collections</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {collections.map((c) => (
-                <div key={c.id} className="rounded-2xl border border-border bg-card p-5">
-                  <h3 className="font-semibold">{c.name}</h3>
-                  <p className="text-sm text-muted mt-1">
-                    {c.tutorialIds.length} clips {c.public ? "· Public" : "· Private"}
-                  </p>
-                </div>
-              ))}
-            </div>
-            {collections.map((c) => {
-              const list = byIds(c.tutorialIds);
-              if (!list.length) return null;
-              return (
-                <div key={c.id + "-g"} className="mt-8">
-                  <h3 className="font-semibold mb-3">{c.name}</h3>
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {list.map((t) => t && <TutorialCard key={t.id} tutorial={t} />)}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         )}
 

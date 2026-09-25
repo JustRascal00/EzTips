@@ -1,4 +1,5 @@
 import type { Tutorial } from "@/lib/types";
+import { isEnabledGame } from "./games";
 
 const lolSplash = (champ: string, skin = 0) =>
   `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champ}_${skin}.jpg`;
@@ -14,7 +15,7 @@ const videos = [
   "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
 ];
 
-export const tutorials: Tutorial[] = [
+const allTutorials: Tutorial[] = [
   {
     id: "t1",
     slug: "stop-making-this-roaming-mistake",
@@ -613,6 +614,8 @@ export const tutorials: Tutorial[] = [
     createdAt: "2026-07-29T18:10:00Z",
   },
 ];
+
+export const tutorials: Tutorial[] = allTutorials.filter((t) => isEnabledGame(t.gameId));
 
 export function getTutorial(idOrSlug: string) {
   return tutorials.find((t) => t.id === idOrSlug || t.slug === idOrSlug);

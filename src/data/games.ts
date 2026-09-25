@@ -1,13 +1,13 @@
 import type { Game } from "@/lib/types";
+import { DDRAGON_FALLBACK_VERSION, championIconUrl, championSplashUrl } from "@/lib/ddragon/shared";
 
-const lol = (champ: string) =>
-  `https://ddragon.leagueoflegends.com/cdn/14.14.1/img/champion/${champ}.png`;
-const lolSplash = (champ: string, skin = 0) =>
-  `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champ}_${skin}.jpg`;
+// Seed/mock data only. Live champion data comes from Data Dragon (see lib/ddragon/server.ts).
+const lol = (champ: string) => championIconUrl(DDRAGON_FALLBACK_VERSION, champ);
+const lolSplash = (champ: string, skin = 0) => championSplashUrl(champ, skin);
 const val = (id: string) =>
   `https://media.valorant-api.com/agents/${id}/displayicon.png`;
 
-export const games: Game[] = [
+const allGames: Game[] = [
   {
     id: "lol",
     name: "League of Legends",
@@ -278,6 +278,11 @@ export const games: Game[] = [
     characters: [],
   },
 ];
+
+/** v1 is League of Legends only. Add ids here to bring other games back. */
+export const ENABLED_GAME_IDS: readonly string[] = ["lol"];
+export const isEnabledGame = (id: string) => ENABLED_GAME_IDS.includes(id);
+export const games: Game[] = allGames.filter((game) => isEnabledGame(game.id));
 
 export const trendingSkills = [
   { id: "aim", name: "Aim Training", tutorials: 1284 },

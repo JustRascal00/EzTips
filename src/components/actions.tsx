@@ -1,10 +1,8 @@
 "use client";
 
 import { Bookmark } from "lucide-react";
-import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { cn } from "@/lib/cn";
-import { Button, Modal } from "./ui";
 import { Tooltip } from "./ui";
 
 export function SaveControl({
@@ -14,19 +12,14 @@ export function SaveControl({
   tutorialId: string;
   vertical?: boolean;
 }) {
-  const { saved, toggleSave, collections, saveToCollection, createCollection } = useApp();
+  const { saved, toggleSave } = useApp();
   const on = saved.includes(tutorialId);
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
 
   return (
     <>
       <Tooltip label={on ? "Saved" : "Save"}>
         <button
-          onClick={() => {
-            if (on) toggleSave(tutorialId);
-            else setOpen(true);
-          }}
+          onClick={() => toggleSave(tutorialId)}
           className={cn(
             "flex items-center gap-2 transition-colors duration-200",
             vertical ? "flex-col text-xs text-muted" : "text-muted hover:text-text",
@@ -46,50 +39,6 @@ export function SaveControl({
           {vertical && "Save"}
         </button>
       </Tooltip>
-      <Modal open={open} onClose={() => setOpen(false)} title="Save to collection">
-        <div className="space-y-2 mb-4">
-          {collections.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                saveToCollection(tutorialId, c.id);
-                setOpen(false);
-              }}
-              className="w-full flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2.5 text-sm hover:bg-hover transition-colors duration-150"
-            >
-              <span>{c.name}</span>
-              <span className="text-muted text-xs">{c.tutorialIds.length}</span>
-            </button>
-          ))}
-        </div>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!name.trim()) return;
-            createCollection(name.trim(), tutorialId);
-            setName("");
-            setOpen(false);
-          }}
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="New collection"
-            className="flex-1 h-10 rounded-xl bg-card border border-border px-3 text-sm outline-none"
-          />
-          <Button type="submit">Create</Button>
-        </form>
-        <button
-          className="mt-3 text-sm text-muted hover:text-text"
-          onClick={() => {
-            toggleSave(tutorialId);
-            setOpen(false);
-          }}
-        >
-          Save without a collection
-        </button>
-      </Modal>
     </>
   );
 }

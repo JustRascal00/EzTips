@@ -2,18 +2,16 @@
 
 import { AppShell } from "@/components/layout/AppShell";
 import { GameLogo } from "@/components/GameLogo";
-import { Progress, RankBadge } from "@/components/ui";
-import { achievements } from "@/data/notifications";
+import { RankBadge } from "@/components/ui";
 import { games } from "@/data/games";
 import { useApp } from "@/lib/store";
-import { cn } from "@/lib/cn";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Clapperboard, Settings2 } from "lucide-react";
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>();
-  const { currentUser, selectedGames, collections, followedCreators } = useApp();
+  const { currentUser, selectedGames, followedCreators } = useApp();
   const user = currentUser;
 
   return (
@@ -46,18 +44,6 @@ export default function UserProfilePage() {
 
         <div className="grid sm:grid-cols-3 gap-3 mt-8">
           <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="text-xs text-muted">Level</div>
-            <div className="text-2xl font-semibold mt-1">{user.level}</div>
-            <Progress value={(user.xp / user.xpToNext) * 100} className="mt-2" barClassName="bg-xp" />
-            <div className="text-xs text-muted mt-1">
-              {user.xp.toLocaleString()} / {user.xpToNext.toLocaleString()} XP
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="text-xs text-muted">Streak</div>
-            <div className="text-2xl font-semibold mt-1">{user.streak} days</div>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-4">
             <div className="text-xs text-muted">Following</div>
             <div className="text-2xl font-semibold mt-1">{followedCreators.length}</div>
           </div>
@@ -77,37 +63,6 @@ export default function UserProfilePage() {
           </div>
         </section>
 
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Public collections</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {collections
-              .filter((c) => c.public)
-              .map((c) => (
-                <div key={c.id} className="rounded-2xl border border-border bg-card p-4">
-                  <div className="font-semibold">{c.name}</div>
-                  <div className="text-sm text-muted">{c.tutorialIds.length} clips</div>
-                </div>
-              ))}
-          </div>
-        </section>
-
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Achievements</h2>
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {achievements.map((a) => (
-              <div
-                key={a.id}
-                className={cn(
-                  "rounded-2xl border p-4",
-                  a.earned ? "border-border bg-card" : "border-border bg-elevated opacity-50",
-                )}
-              >
-                <div className="font-semibold">{a.name}</div>
-                <div className="text-xs text-muted mt-1">{a.description}</div>
-              </div>
-            ))}
-          </div>
-        </section>
 
       </div>
     </AppShell>

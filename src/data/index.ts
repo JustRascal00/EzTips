@@ -70,7 +70,8 @@ export function searchAll(query: string, additionalTutorials: Tutorial[] = []) {
       .map((ch) => ({ gameId: game.id, ...ch })),
   );
 
-  const paths = learningPaths.filter((p) => {
+  // Learning paths are hidden for now.
+  const paths = learningPaths.filter(() => false).filter((p) => {
     const game = getGame(p.gameId);
     return (
       p.title.toLowerCase().includes(q) ||

@@ -14,7 +14,7 @@ export default function OnboardingPage() {
   const { completeOnboarding } = useApp();
   const { configured, loading, user } = useAuth();
   const router = useRouter();
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(games.length === 1 ? [games[0].id] : []);
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
 

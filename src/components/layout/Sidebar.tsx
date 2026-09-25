@@ -126,7 +126,7 @@ export function Sidebar({
           {!collapsed && (
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{currentUser.displayName}</div>
-              <div className="text-[11px] text-muted">Level {currentUser.level}</div>
+              <div className="text-[11px] text-muted">@{currentUser.username}</div>
             </div>
           )}
         </Link>

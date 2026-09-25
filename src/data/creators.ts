@@ -1,9 +1,10 @@
 import type { Creator } from "@/lib/types";
+import { isEnabledGame } from "./games";
 
 const avatar = (seed: string) =>
   `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(seed)}&backgroundColor=141820`;
 
-export const creators: Creator[] = [
+const allCreators: Creator[] = [
   {
     id: "kai",
     username: "KaiCoach",
@@ -159,6 +160,8 @@ export const creators: Creator[] = [
     mainFocus: "Aim coaching",
   },
 ];
+
+export const creators: Creator[] = allCreators.filter((c) => isEnabledGame(c.gameId));
 
 export const currentUserSeed = {
   username: "ashen",

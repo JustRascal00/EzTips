@@ -138,7 +138,7 @@ export default function MarketingPage() {
             {[
               ["01", "Choose your games", "Select one or many games during onboarding and change them whenever you want."],
               ["02", "Swipe useful clips", "For You stays inside those games. Explore lets you branch out intentionally."],
-              ["03", "Save what works", "Organize tips into collections like Ahri Combos, Valorant Aim, or CS2 Smokes."],
+              ["03", "Save what works", "Save the clips that help and come back to them before your next game."],
             ].map(([number, title, body]) => (
               <div key={number} className="rounded-2xl border border-border bg-card p-6">
                 <div className="text-xs font-bold text-accent">{number}</div>

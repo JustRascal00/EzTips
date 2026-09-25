@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNextPath } from "@/lib/safe-redirect";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 const inputClass =
@@ -42,7 +43,7 @@ export function AuthForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const next = searchParams.get("next") || (mode === "signup" ? "/onboarding" : "/home");
+  const next = safeNextPath(searchParams.get("next"), mode === "signup" ? "/onboarding" : "/home");
 
   useEffect(() => {
     if (!loading && user) router.replace(next);
