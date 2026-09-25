@@ -8,6 +8,8 @@ export const TIP_SELECT = [
   "id,user_id,slug,title,description,game_id,category,topic,character,tags,skill_level,duration_seconds",
   "video_url,thumbnail_url,views,likes_count,comments_count,created_at,champion_id,role_id,map_id",
   "upvotes,downvotes,score,learning_metadata",
+  // computed columns from migration 005
+  "still_works_pct,still_works_yes,still_works_no,is_outdated,patches_behind",
   "profiles!videos_user_id_fkey(username,display_name,avatar_url)",
   "champions(id,name)",
   "patches(version,is_current)",
@@ -42,6 +44,11 @@ export type TipRow = {
   downvotes: number | null;
   score: number | null;
   learning_metadata: Record<string, unknown> | null;
+  still_works_pct?: number | null;
+  still_works_yes?: number | null;
+  still_works_no?: number | null;
+  is_outdated?: boolean | null;
+  patches_behind?: number | null;
   profiles?: One<{ username: string; display_name: string; avatar_url: string | null }>;
   champions?: One<{ id: string; name: string }>;
   patches?: One<{ version: string; is_current: boolean }>;
@@ -93,11 +100,17 @@ export function rowToTip(row: TipRow): Tutorial {
     downvotes: Number(row.downvotes ?? 0),
     score: Number(row.score ?? 0),
     seed: meta.seed === true,
+    stillWorksPct: row.still_works_pct ?? null,
+    stillWorksYes: Number(row.still_works_yes ?? 0),
+    stillWorksNo: Number(row.still_works_no ?? 0),
+    outdated: row.is_outdated === true,
+    patchesBehind: row.patches_behind ?? null,
   };
 }
 
 export type TipQuery = {
   championId?: string;
+  creatorIds?: string[];
   roleId?: string;
   mapId?: string;
   skill?: string;
@@ -119,6 +132,7 @@ function publicTips(client: SupabaseClient) {
 function applyFilters<T extends ReturnType<typeof publicTips>>(query: T, q: TipQuery): T {
   let next = query;
   if (q.championId) next = next.eq("champion_id", q.championId) as T;
+  if (q.creatorIds) next = next.in("user_id", q.creatorIds.length ? q.creatorIds : ["00000000-0000-0000-0000-000000000000"]) as T;
   if (q.roleId) next = next.eq("role_id", q.roleId) as T;
   if (q.mapId) next = next.eq("map_id", q.mapId) as T;
   if (q.skill) next = next.eq("skill_level", q.skill) as T;
@@ -133,8 +147,9 @@ function toTips(data: unknown) {
 
 export async function listTips(client: SupabaseClient, q: TipQuery = {}) {
   let query = applyFilters(publicTips(client), q);
+  // "top" = patch-aware ranking (votes + still-works, minus patch age, outdated sinks).
   query = q.sort === "top"
-    ? query.order("score", { ascending: false }).order("created_at", { ascending: false })
+    ? query.order("rank_score", { ascending: false }).order("created_at", { ascending: false })
     : query.order("created_at", { ascending: false });
   const { data, error } = await query.limit(q.limit ?? 60);
   if (error) throw error;
@@ -147,7 +162,7 @@ export async function searchTips(client: SupabaseClient, text: string, q: TipQue
   if (!clean) return [];
   const { data, error } = await applyFilters(publicTips(client), q)
     .textSearch("search_vector", clean, { type: "websearch", config: "english" })
-    .order("score", { ascending: false })
+    .order("rank_score", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(q.limit ?? 40);
   if (error) throw error;
@@ -198,6 +213,16 @@ export async function searchCreators(client: SupabaseClient, text: string, limit
     .limit(limit);
   if (error) throw error;
   return (data ?? []) as CreatorSummary[];
+}
+
+/** Profiles by id (keeps order), with follower counts. */
+export async function getProfilesByIds(client: SupabaseClient, ids: string[]) {
+  const valid = [...new Set(ids.filter((id) => UUID.test(id)))].slice(0, 200);
+  if (!valid.length) return [];
+  const { data, error } = await client.from("profiles").select("id,username,display_name,avatar_url,bio,follower_count").in("id", valid);
+  if (error) throw error;
+  const byId = new Map(((data ?? []) as (CreatorSummary & { follower_count: number })[]).map((p) => [p.id, p]));
+  return valid.map((id) => byId.get(id)).filter((p): p is CreatorSummary & { follower_count: number } => Boolean(p));
 }
 
 export async function getCurrentPatch(client: SupabaseClient) {

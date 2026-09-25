@@ -1,9 +1,10 @@
 "use client";
 
-import { creators } from "@/data/creators";
 import { games } from "@/data/games";
 import { cn } from "@/lib/cn";
 import { useApp } from "@/lib/store";
+import { getProfilesByIds, type CreatorSummary } from "@/lib/tips";
+import { useSupabaseQuery } from "@/lib/use-tips";
 import {
   Bell,
   Bookmark,
@@ -37,7 +38,7 @@ export function Sidebar({
   const pathname = usePathname();
   const { currentUser, followedCreators, notifications, isLoggedIn } = useApp();
   const unread = notifications.filter((n) => !n.read).length;
-  const followed = creators.filter((c) => followedCreators.includes(c.id)).slice(0, 6);
+  const { data: followed } = useSupabaseQuery(`sidebar-following:${followedCreators.slice(0, 6).join(",")}`, (client) => getProfilesByIds(client, followedCreators.slice(0, 6)), [] as CreatorSummary[]);
 
   return (
     <aside
@@ -79,11 +80,11 @@ export function Sidebar({
             {followed.map((c) => (
               <Link
                 key={c.id}
-                href={`/c/${c.username}`}
+                href={`/u/${c.username}`}
                 className="flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-hover transition-colors duration-150"
               >
-                <Avatar src={c.avatar} alt="" size={28} />
-                <span className="text-sm truncate">{c.displayName}</span>
+                <Avatar src={c.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(c.username)}`} alt="" size={28} />
+                <span className="text-sm truncate">{c.display_name}</span>
               </Link>
             ))}
           </div>

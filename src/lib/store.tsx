@@ -13,6 +13,18 @@ import {
 import { notifications as seedNotifications } from "@/data/notifications";
 import { useAuth } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
+import {
+  castVote,
+  emptyEngagement,
+  loadMyEngagement,
+  setFollowing,
+  setSaved,
+  setStillWorks,
+  type MyEngagement,
+  type StillWorksTotals,
+  type VoteTotals,
+  type VoteValue,
+} from "@/lib/engagement";
 import { currentUserSeed } from "@/data/creators";
 import { learningPaths } from "@/data/paths";
 import type {
@@ -104,6 +116,13 @@ type Store = Persist & {
   completeOnboarding: (games: string[]) => Promise<void>;
   toggleLike: (id: string) => void;
   toggleHelpful: (id: string) => void;
+  /** Your vote per tip id (Supabase). */
+  myVotes: Record<string, VoteValue>;
+  /** Your "still works on this patch" answer per tip id (Supabase). */
+  myFlags: Record<string, boolean>;
+  /** 1 = up, -1 = down, 0 = remove. Resolves with fresh totals, or null if it failed / not signed in. */
+  vote: (id: string, value: VoteValue | 0) => Promise<VoteTotals | null>;
+  flagStillWorks: (id: string, works: boolean | null) => Promise<StillWorksTotals | null>;
   toggleSave: (id: string) => void;
   saveToCollection: (tutorialId: string, collectionId: string) => void;
   createCollection: (name: string, tutorialId?: string) => void;
@@ -136,6 +155,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [backendGames, setBackendGames] = useState<string[] | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Signed-in engagement lives in Supabase; localStorage is only used when Supabase isn't configured.
+  const [remote, setRemote] = useState<MyEngagement>(emptyEngagement);
+  const remoteRef = useRef(remote);
+  useEffect(() => { remoteRef.current = remote; }, [remote]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let cancelled = false;
+    if (!configured || !user || !supabase) {
+      queueMicrotask(() => { if (!cancelled) setRemote(emptyEngagement); });
+      return () => { cancelled = true; };
+    }
+    loadMyEngagement(supabase, user.id)
+      .then((next) => { if (!cancelled) setRemote(next); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [configured, user]);
 
   useEffect(() => {
     setState(load());
@@ -172,6 +208,59 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
+  const signedInClient = useCallback((action: string) => {
+    const supabase = createClient();
+    if (!supabase || !user) {
+      toast(`Sign in to ${action}`);
+      return null;
+    }
+    return { supabase, userId: user.id };
+  }, [toast, user]);
+
+  const vote = useCallback(async (id: string, value: VoteValue | 0) => {
+    const ctx = signedInClient("vote");
+    if (!ctx) return null;
+    const previous = remoteRef.current.votes[id];
+    setRemote((r) => {
+      const votes = { ...r.votes };
+      if (value === 0) delete votes[id]; else votes[id] = value;
+      return { ...r, votes };
+    });
+    try {
+      return await castVote(ctx.supabase, id, value);
+    } catch (error) {
+      setRemote((r) => {
+        const votes = { ...r.votes };
+        if (previous) votes[id] = previous; else delete votes[id];
+        return { ...r, votes };
+      });
+      toast(error instanceof Error ? error.message : "Couldn't vote");
+      return null;
+    }
+  }, [signedInClient, toast]);
+
+  const flagStillWorks = useCallback(async (id: string, works: boolean | null) => {
+    const ctx = signedInClient("answer");
+    if (!ctx) return null;
+    const previous = remoteRef.current.flags[id];
+    setRemote((r) => {
+      const flags = { ...r.flags };
+      if (works === null) delete flags[id]; else flags[id] = works;
+      return { ...r, flags };
+    });
+    try {
+      return await setStillWorks(ctx.supabase, id, works);
+    } catch (error) {
+      setRemote((r) => {
+        const flags = { ...r.flags };
+        if (previous === undefined) delete flags[id]; else flags[id] = previous;
+        return { ...r, flags };
+      });
+      toast(error instanceof Error ? error.message : "Couldn't save your answer");
+      return null;
+    }
+  }, [signedInClient, toast]);
+
   // XP / levels are hidden for now: keep the API so callers still compile, but do nothing.
   const addXp = useCallback((amount: number, reason?: string) => {
     void amount;
@@ -202,11 +291,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const toggleLike = useCallback((id: string) => {
+    if (configured) {
+      void vote(id, remoteRef.current.votes[id] === 1 ? 0 : 1);
+      return;
+    }
     setState((s) => {
       const on = s.liked.includes(id);
       return { ...s, liked: on ? s.liked.filter((x) => x !== id) : [...s.liked, id] };
     });
-  }, []);
+  }, [configured, vote]);
 
   const toggleHelpful = useCallback(
     (id: string) => {
@@ -223,6 +316,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleSave = useCallback(
     (id: string) => {
+      if (configured) {
+        const ctx = signedInClient("save tips");
+        if (!ctx) return;
+        const was = remoteRef.current.saved.includes(id);
+        setRemote((r) => ({ ...r, saved: was ? r.saved.filter((x) => x !== id) : [id, ...r.saved] }));
+        setSaved(ctx.supabase, ctx.userId, id, !was)
+          .then(() => toast(was ? "Removed from saved" : "Saved"))
+          .catch((error: Error) => {
+            setRemote((r) => ({ ...r, saved: was ? [id, ...r.saved] : r.saved.filter((x) => x !== id) }));
+            toast(error.message);
+          });
+        return;
+      }
       const already = stateRef.current.saved.includes(id);
       setState((s) => {
         const on = s.saved.includes(id);
@@ -230,7 +336,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       toast(already ? "Removed from saved" : "Saved");
     },
-    [toast],
+    [configured, signedInClient, toast],
   );
 
   const saveToCollection = useCallback(
@@ -269,6 +375,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const toggleFollowCreator = useCallback(
     (id: string) => {
+      if (configured) {
+        const ctx = signedInClient("follow creators");
+        if (!ctx) return;
+        if (ctx.userId === id) { toast("That's you"); return; }
+        const was = remoteRef.current.following.includes(id);
+        setRemote((r) => ({ ...r, following: was ? r.following.filter((x) => x !== id) : [...r.following, id] }));
+        setFollowing(ctx.supabase, ctx.userId, id, !was)
+          .then(() => toast(was ? "Unfollowed" : "Following"))
+          .catch((error: Error) => {
+            setRemote((r) => ({ ...r, following: was ? [...r.following, id] : r.following.filter((x) => x !== id) }));
+            toast(error.message);
+          });
+        return;
+      }
       const on = stateRef.current.followedCreators.includes(id);
       setState((s) => {
         const isOn = s.followedCreators.includes(id);
@@ -281,7 +401,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       toast(on ? "Unfollowed" : "Following");
     },
-    [toast],
+    [configured, signedInClient, toast],
   );
 
   const toggleFollowGame = useCallback((id: string) => {
@@ -426,13 +546,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       username: profile?.username ?? currentUserSeed.username,
       displayName: profile?.display_name ?? user?.email?.split("@")[0] ?? currentUserSeed.displayName,
       avatar: profile?.avatar_url || currentUserSeed.avatar,
-      bio: profile?.bio || currentUserSeed.bio,
+      // Real accounts never show the mock bio / ranks.
+      bio: user ? (profile?.bio ?? "") : currentUserSeed.bio,
+      ranks: user ? [] : currentUserSeed.ranks,
+      id: user?.id,
       xp: state.xp,
       level: 18 + Math.floor(Math.max(0, state.xp - currentUserSeed.xp) / 400),
     };
 
+    const liked = configured ? Object.keys(remote.votes).filter((id) => remote.votes[id] === 1) : state.liked;
     return {
       ...state,
+      liked,
+      saved: configured ? remote.saved : state.saved,
+      followedCreators: configured ? remote.following : state.followedCreators,
+      myVotes: remote.votes,
+      myFlags: remote.flags,
+      vote,
+      flagStillWorks,
       selectedGames: backendGames ?? state.selectedGames,
       hydrated: hydrated && !authLoading,
       toasts,
@@ -494,6 +625,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     profile,
     user,
     backendGames,
+    remote,
+    vote,
+    flagStillWorks,
   ]);
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

@@ -79,6 +79,11 @@ export type Tutorial = {
   downvotes?: number;
   score?: number;
   seed?: boolean;
+  stillWorksPct?: number | null;
+  stillWorksYes?: number;
+  stillWorksNo?: number;
+  outdated?: boolean;
+  patchesBehind?: number | null;
 };
 
 export type PathLesson = {
@@ -151,6 +156,8 @@ export type Toast = {
 };
 
 export type CurrentUser = {
+  /** Supabase user id when signed in. */
+  id?: string;
   username: string;
   displayName: string;
   avatar: string;

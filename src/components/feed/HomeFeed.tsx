@@ -1,6 +1,6 @@
 "use client";
 
-import { FollowButton, SaveControl } from "@/components/actions";
+import { FollowButton, PatchBadge, SaveControl, VoteControl } from "@/components/actions";
 import { CommentThread } from "@/components/Comments";
 import { GameLogo } from "@/components/GameLogo";
 import { VideoPlayer } from "@/components/VideoPlayer";
@@ -12,7 +12,7 @@ import { useApp, type VideoSignal } from "@/lib/store";
 import { listTips, searchCreators, searchTips, type CreatorSummary } from "@/lib/tips";
 import type { Tutorial } from "@/lib/types";
 import { useChampions, useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
-import { ArrowDown, CheckCircle2, Clock3, Heart, MessageCircle, MoreHorizontal, Plus, Search, Share2, Sparkles, X } from "lucide-react";
+import { ArrowDown, CheckCircle2, Clock3, MessageCircle, MoreHorizontal, Plus, Search, Share2, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -142,8 +142,7 @@ function creatorOf(tutorial: Tutorial): FeedCreator | undefined {
 function FeedItem({ tutorial, nextTutorial, trending, suggestedCreators, active, onActivate, onOpenComments }: { tutorial: Tutorial; nextTutorial?: Tutorial; trending: Tutorial[]; suggestedCreators: FeedCreator[]; active: boolean; onActivate: () => void; onOpenComments: () => void }) {
   const game = games.find((item) => item.id === tutorial.gameId);
   const creator = creatorOf(tutorial);
-  const { liked, completedTutorials, toggleLike, toast, recordVideoComplete, recordVideoShare } = useApp();
-  const isLiked = liked.includes(tutorial.id);
+  const { completedTutorials, toast, recordVideoComplete, recordVideoShare } = useApp();
   const watched = completedTutorials.includes(tutorial.id);
   const displayTags = Array.from(new Map(
     [tutorial.championName ?? tutorial.character, tutorial.topic, ...tutorial.tags]
@@ -172,14 +171,15 @@ function FeedItem({ tutorial, nextTutorial, trending, suggestedCreators, active,
               {creator && <div className="mb-3 flex items-center gap-2.5"><Link href={`/u/${creator.username}`} className="flex min-w-0 items-center gap-2.5"><img src={creator.avatar} alt={creator.displayName} className="h-9 w-9 rounded-full border border-white/20 object-cover" /><span className="truncate text-sm font-semibold text-white">@{creator.username}</span></Link><FollowButton creatorId={tutorial.creatorId} size="sm" />{watched && <span className="ml-auto flex items-center gap-1 text-[10px] text-white/60"><CheckCircle2 className="h-3.5 w-3.5 text-success" />Watched</span>}</div>}
               <Link href={`/t/${tutorial.slug}`}><h2 className="max-w-[440px] text-xl font-bold leading-tight text-white sm:text-[23px]">{tutorial.title}</h2></Link>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/65">
-                {tutorial.patch && <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-bold", tutorial.patchIsCurrent ? "bg-accent/80 text-white" : "bg-amber-400/20 text-amber-200")}>{tutorial.patch}</span>}
+                <PatchBadge patch={tutorial.patch} current={tutorial.patchIsCurrent} outdated={tutorial.outdated} />
+                {typeof tutorial.stillWorksPct === "number" && <span className="rounded-md bg-success/15 px-1.5 py-0.5 text-[11px] font-semibold text-success">{tutorial.stillWorksPct}% still works</span>}
                 {displayTags.map((tag) => <Link key={tag.toLocaleLowerCase()} href={`/search?q=${encodeURIComponent(tag)}`} className="rounded-full bg-white/10 px-2.5 py-1 font-medium text-white/80 backdrop-blur-sm hover:bg-white/15">{tag}</Link>)}
               </div>
               <div className="mt-2 text-[11px] text-white/45">{formatCount(tutorial.views)} views · {tutorial.duration}s</div>
             </div>
           </div>
           <div className="absolute bottom-5 right-0 z-30 flex flex-col items-center gap-3">
-            <ActionButton label="Like" count={tutorial.likes + (isLiked ? 1 : 0)} active={isLiked} onClick={() => toggleLike(tutorial.id)}><Heart className={cn("h-[18px] w-[18px]", isLiked && "fill-current")} /></ActionButton>
+            <VoteControl vertical tipId={tutorial.id} ownerId={tutorial.creatorId} initial={{ upvotes: tutorial.upvotes ?? 0, downvotes: tutorial.downvotes ?? 0, score: tutorial.score ?? 0 }} />
             <ActionButton label="Comments" count={tutorial.comments} onClick={onOpenComments}><MessageCircle className="h-[18px] w-[18px]" /></ActionButton>
             <SaveControl tutorialId={tutorial.id} vertical />
             <ActionButton label="Share" onClick={() => { navigator.clipboard?.writeText(`${window.location.origin}/t/${tutorial.slug}`); recordVideoShare(tutorial.id); toast("Link copied"); }}><Share2 className="h-[18px] w-[18px]" /></ActionButton>
@@ -204,7 +204,7 @@ function FeedItem({ tutorial, nextTutorial, trending, suggestedCreators, active,
 }
 
 export function HomeFeed() {
-  const { selectedGames, followedCreators, liked, saved, completedTutorials, searches, videoSignals, addHistory, recordVideoStart, recordVideoSkip, toggleLike, toggleSave, toggleFollowCreator } = useApp();
+  const { selectedGames, followedCreators, liked, saved, completedTutorials, searches, videoSignals, addHistory, recordVideoStart, recordVideoSkip, toggleSave, toggleFollowCreator } = useApp();
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [activeGames, setActiveGames] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -281,7 +281,6 @@ export function HomeFeed() {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || commentsVideo) return;
       const key = event.key.toLowerCase();
       const current = feed[activeIndex];
-      if (key === "l" && current) { toggleLike(current.id); return; }
       if (key === "s" && current) { event.preventDefault(); toggleSave(current.id); return; }
       if (key === "f" && current) { toggleFollowCreator(current.creatorId); return; }
       const next = event.key === "ArrowDown" || key === "j";
@@ -291,7 +290,7 @@ export function HomeFeed() {
       scrollerRef.current?.scrollBy({ top: (next ? 1 : -1) * (scrollerRef.current?.clientHeight ?? 0), behavior: "smooth" });
     };
     window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeIndex, commentsVideo, feed, toggleFollowCreator, toggleLike, toggleSave]);
+  }, [activeIndex, commentsVideo, feed, toggleFollowCreator, toggleSave]);
 
   const ambientGame = games.find((game) => game.id === feed[activeIndex]?.gameId);
   const trending = useMemo(() => [...communityVideos].sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || b.views - a.views).slice(0, 6), [communityVideos]);

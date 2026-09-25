@@ -8,6 +8,7 @@ import { pathDuration } from "@/data/paths";
 import Link from "next/link";
 import { useState } from "react";
 import { RankBadge } from "./ui";
+import { PatchBadge } from "./actions";
 import { GameLogo } from "./GameLogo";
 
 export function GameCard({
@@ -117,14 +118,10 @@ export function TutorialCard({
         <span className="absolute bottom-2 right-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-medium">
           {formatDuration(tutorial.duration)}
         </span>
-        <span
-          className={cn(
-            "absolute top-2 left-2 rounded-md px-1.5 py-0.5 text-[11px] font-semibold",
-            tutorial.patch && tutorial.patchIsCurrent ? "bg-accent/85 text-white" : "bg-black/70 text-white/80",
-          )}
-        >
-          {tutorial.patch ? `Patch ${tutorial.patch}` : "Patch ?"}
-        </span>
+        <PatchBadge className="absolute top-2 left-2" patch={tutorial.patch} current={tutorial.patchIsCurrent} outdated={tutorial.outdated} />
+        {typeof tutorial.stillWorksPct === "number" && (
+          <span className="absolute top-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-success">{tutorial.stillWorksPct}% works</span>
+        )}
       </div>
       <div className="mt-2.5">
         <div className="text-[13px] text-muted">

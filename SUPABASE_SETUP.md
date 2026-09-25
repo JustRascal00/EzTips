@@ -3,7 +3,7 @@
 The app is wired for Supabase Auth, Postgres, and Storage. Until credentials are present, the existing example feed remains available and publishing is disabled.
 
 1. Create a Supabase project.
-2. Open **SQL Editor** and run the migrations in order: `001_eztips_backend.sql`, `002_creator_studio.sql`, `003_learning_core.sql`, `004_duration_rule.sql`. All are safe to re-run.
+2. Open **SQL Editor** and run the migrations in order: `001_eztips_backend.sql`, `002_creator_studio.sql`, `003_learning_core.sql`, `004_duration_rule.sql`, `005_votes_ranking.sql`. All are safe to re-run.
 3. Copy `.env.example` to `.env.local`.
 4. From the Supabase **Connect** dialog, add the project URL and publishable key to `.env.local`.
 5. In **Authentication → URL Configuration**, set the local Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` as a redirect URL.

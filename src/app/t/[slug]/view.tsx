@@ -1,6 +1,6 @@
 "use client";
 
-import { FollowButton, HelpfulButton, SaveControl } from "@/components/actions";
+import { FollowButton, PatchBadge, SaveControl, StillWorksControl, VoteControl } from "@/components/actions";
 import { CommentThread } from "@/components/Comments";
 import { TutorialCard } from "@/components/cards";
 import { AppShell } from "@/components/layout/AppShell";
@@ -9,15 +9,16 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { Chip, RankBadge } from "@/components/ui";
 import { formatDuration, formatCount, skillLabel } from "@/lib/format";
 import { listTips } from "@/lib/tips";
-import { useSupabaseQuery } from "@/lib/use-tips";
+import { useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
 import { useApp } from "@/lib/store";
-import { Heart, Share2 } from "lucide-react";
+import { Share2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 import type { Tutorial } from "@/lib/types";
 
 export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
-  const { liked, toggleLike, addHistory, toast } = useApp();
+  const { addHistory, toast } = useApp();
+  const { patch: currentPatch } = useCurrentPatch();
   const tutorialId = tutorial.id;
 
   useEffect(() => {
@@ -40,7 +41,6 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
   }, [] as Tutorial[]);
   const roleLabel = tutorial.roleId ? ({ top: "Top", jungle: "Jungle", mid: "Mid", adc: "ADC", support: "Support" } as Record<string, string>)[tutorial.roleId] : null;
   const mapLabel = tutorial.mapId ? ({ sr: "Summoner's Rift", aram: "ARAM", arena: "Arena" } as Record<string, string>)[tutorial.mapId] : null;
-  const likeOn = liked.includes(tutorial.id);
 
   return (
     <AppShell
@@ -76,12 +76,7 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           {roleLabel && <span>· {roleLabel}</span>}
           {mapLabel && <span>· {mapLabel}</span>}
           <span>· {tutorial.topic}</span>
-          <span
-            className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${tutorial.patch ? (tutorial.patchIsCurrent ? "bg-accent/15 text-accent" : "bg-amber-400/10 text-amber-300") : "bg-card text-muted"}`}
-            title={tutorial.patch && !tutorial.patchIsCurrent ? "Made on an older patch. It may be outdated." : undefined}
-          >
-            {tutorial.patch ? `Patch ${tutorial.patch}` : "Patch unknown"}
-          </span>
+          <PatchBadge patch={tutorial.patch} current={tutorial.patchIsCurrent} outdated={tutorial.outdated} />
         </div>
         <h1 className="text-3xl font-bold mt-2 tracking-tight">{tutorial.title}</h1>
         {creator && (
@@ -104,16 +99,10 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           <span>{formatCount(tutorial.views)} views</span>
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-4">
-          <button
-            onClick={() => toggleLike(tutorial.id)}
-            className="h-10 px-3 rounded-xl border border-border bg-card text-sm inline-flex items-center gap-2 hover:bg-hover"
-          >
-            <Heart className={`h-4 w-4 ${likeOn ? "fill-current text-danger" : ""}`} />
-            Like
-          </button>
-          <HelpfulButton
-            tutorialId={tutorial.id}
-            countLabel="Helpful"
+          <VoteControl
+            tipId={tutorial.id}
+            ownerId={tutorial.creatorId}
+            initial={{ upvotes: tutorial.upvotes ?? 0, downvotes: tutorial.downvotes ?? 0, score: tutorial.score ?? 0 }}
           />
           <SaveControl tutorialId={tutorial.id} />
           <button
@@ -126,6 +115,20 @@ export function TutorialView({ tutorial }: { tutorial: Tutorial }) {
           >
             <Share2 className="h-4 w-4" />
           </button>
+        </div>
+        {tutorial.outdated && (
+          <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-amber-100">
+            This tip may be outdated{tutorial.patch ? `: it was made on patch ${tutorial.patch}` : ""}{tutorial.patchesBehind ? ` (${tutorial.patchesBehind} patches ago)` : ""}, or players reported it no longer works.
+          </div>
+        )}
+        <div className="mt-4">
+          <StillWorksControl
+            tipId={tutorial.id}
+            patch={currentPatch}
+            initialPct={tutorial.stillWorksPct ?? null}
+            initialYes={tutorial.stillWorksYes ?? 0}
+            initialNo={tutorial.stillWorksNo ?? 0}
+          />
         </div>
         <div className="flex flex-wrap gap-1.5 mt-4">
           {tutorial.tags.map((tag) => (
