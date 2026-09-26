@@ -2,6 +2,7 @@
 
 import { FollowButton } from "@/components/actions";
 import { AppShell } from "@/components/layout/AppShell";
+import { ReportButton } from "@/components/ReportButton";
 import { ChampionIcon, TipGrid } from "@/components/league";
 import { buttonClass, EmptyState, Segmented, Tabs } from "@/components/ui";
 import { championSplashUrl } from "@/lib/ddragon/shared";
@@ -84,6 +85,7 @@ export function ProfileView({ profile }: { profile: ProfileFull }) {
                 <FollowButton creatorId={profile.id} />
               )}
               <button type="button" onClick={() => { navigator.clipboard?.writeText(window.location.href); toast("Profile link copied"); }} className={buttonClass("ghost", "icon")} aria-label="Copy profile link"><Link2 className="h-4 w-4" /></button>
+              {!isMe && <ReportButton target="profile" targetId={profile.id} compact />}
             </div>
           </div>
 

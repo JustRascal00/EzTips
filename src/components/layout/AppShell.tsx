@@ -3,7 +3,7 @@
 import { useApp } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
-import { Bookmark, Clapperboard, LayoutGrid, LogOut, PlaySquare, Search, Settings, Sparkles, Upload, UserRound, X } from "lucide-react";
+import { Bookmark, Clapperboard, LayoutGrid, LogOut, PlaySquare, Search, Settings, ShieldCheck, Sparkles, Upload, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -11,6 +11,37 @@ import { Logo } from "../Logo";
 import { ToastHost } from "../ToastHost";
 import { Avatar, buttonClass, Skeleton } from "../ui";
 import { GlobalSearch } from "./GlobalSearch";
+import { useSupabaseQuery } from "@/lib/use-tips";
+
+/** Admin / moderator shortcut with the number of open reports. Renders nothing for normal users. */
+function AdminButton() {
+  const { profile } = useAuth();
+  const pathname = usePathname();
+  const isModerator = profile?.role === "moderator" || profile?.role === "admin";
+  // refetch when you navigate, so the badge updates after handling reports
+  const { data: open } = useSupabaseQuery(`open-reports:${isModerator}:${pathname}`, async (client) => {
+    if (!isModerator) return 0;
+    const { count } = await client.from("reports").select("id", { count: "exact", head: true }).eq("status", "open");
+    return count ?? 0;
+  }, 0);
+  if (!isModerator) return null;
+  const active = pathname.startsWith("/admin");
+  return (
+    <Link
+      href="/admin"
+      title={open ? `${open} open reports` : "Admin dashboard"}
+      className={buttonClass(active ? "outline" : "secondary", "sm", cn("relative", active && "border-accent/60 text-accent"))}
+    >
+      <ShieldCheck className="h-4 w-4 text-accent" />
+      <span className="hidden sm:inline">Admin</span>
+      {open > 0 && (
+        <span className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white shadow-lg">
+          {open > 99 ? "99+" : open}
+        </span>
+      )}
+    </Link>
+  );
+}
 
 const NAV = [
   { href: "/", label: "Champions", icon: LayoutGrid, match: (p: string) => p === "/" || p.startsWith("/champions") },
@@ -21,6 +52,8 @@ const NAV = [
 
 function UserMenu() {
   const { currentUser, logout } = useApp();
+  const { profile } = useAuth();
+  const isModerator = profile?.role === "moderator" || profile?.role === "admin";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -46,6 +79,7 @@ function UserMenu() {
           <Link href="/studio" className={item}><Clapperboard className="h-4 w-4" />Creator Studio</Link>
           <Link href="/following" className={item}><Bookmark className="h-4 w-4" />Following</Link>
           <Link href="/settings" className={item}><Settings className="h-4 w-4" />Settings</Link>
+          {isModerator && <Link href="/admin" className={item}><ShieldCheck className="h-4 w-4 text-accent" />Admin dashboard</Link>}
           <div className="my-1 h-px bg-white/[0.06]" />
           <button type="button" onClick={async () => { await logout(); router.push("/"); }} className={item}><LogOut className="h-4 w-4" />Sign out</button>
         </div>
@@ -81,6 +115,7 @@ function TopNav() {
             <button type="button" onClick={() => setMobileSearch(true)} aria-label="Search" className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:text-white md:hidden"><Search className="h-5 w-5" /></button>
             {isLoggedIn ? (
               <>
+                <AdminButton />
                 <Link href="/studio/upload" className={buttonClass("secondary", "sm", "hidden sm:inline-flex")}><Upload className="h-4 w-4" />Upload</Link>
                 <UserMenu />
               </>

@@ -11,6 +11,7 @@ export type BackendProfile = {
   display_name: string;
   avatar_url: string | null;
   bio: string | null;
+  role: "user" | "moderator" | "admin";
 };
 
 type AuthContextValue = {
@@ -41,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data } = await supabase
       .from("profiles")
-      .select("id,username,display_name,avatar_url,bio")
+      .select("id,username,display_name,avatar_url,bio,role")
       .eq("id", nextUser.id)
       .maybeSingle();
     setProfile((data as BackendProfile | null) ?? null);

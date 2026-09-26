@@ -65,6 +65,7 @@ function ContentCard({ video, busy, onVisibility, onDelete }: RowProps) {
 function Thumb({ video }: { video: CreatorVideo }) { return <div className="h-14 w-24 shrink-0 overflow-hidden rounded-lg bg-elevated">{video.thumbnail_url ? <img src={video.thumbnail_url} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-muted">No cover</div>}</div>; }
 
 function VisibilityControl({ video, busy, onChange }: { video: CreatorVideo; busy: boolean; onChange: RowProps["onVisibility"] }) {
+  if (video.status === "hidden") return <span title={video.hidden_reason ?? undefined} className="inline-flex rounded-full bg-danger/15 px-2.5 py-1 text-[11px] font-semibold text-danger">Hidden by moderators</span>;
   const value = video.status === "draft" ? "draft" : video.visibility;
   return <select aria-label={`Visibility for ${video.title}`} disabled={busy} value={value} onChange={(event) => onChange(video, event.target.value as "public" | "unlisted" | "draft")} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-xs font-semibold text-text outline-none focus:border-accent/60"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="draft">Draft</option></select>;
 }

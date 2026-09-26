@@ -64,6 +64,7 @@ export function PageHeading({ eyebrow, title, description, action }: { eyebrow: 
 }
 
 export function Status({ status, visibility }: { status: string; visibility: string }) {
+  if (status === "hidden") return <span className="inline-flex w-fit rounded-full bg-danger/15 px-2.5 py-1 text-[11px] font-semibold text-danger">Hidden by moderators</span>;
   const draft = status === "draft";
   return <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${draft ? "bg-amber-400/10 text-amber-300" : visibility === "unlisted" ? "bg-blue-400/10 text-blue-300" : "bg-emerald-400/10 text-emerald-300"}`}>{draft ? "Draft" : visibility}</span>;
 }

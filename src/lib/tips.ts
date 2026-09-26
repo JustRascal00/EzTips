@@ -7,7 +7,7 @@ import type { SkillLevel, Tutorial } from "@/lib/types";
 export const TIP_SELECT = [
   "id,user_id,slug,title,description,game_id,category,topic,character,tags,skill_level,duration_seconds",
   "video_url,thumbnail_url,views,likes_count,comments_count,created_at,champion_id,role_id,map_id",
-  "upvotes,downvotes,score,learning_metadata",
+  "upvotes,downvotes,score,learning_metadata,status,visibility,hidden_reason",
   // computed columns from migration 005
   "still_works_pct,still_works_yes,still_works_no,is_outdated,patches_behind",
   "profiles!videos_user_id_fkey(username,display_name,avatar_url)",
@@ -44,6 +44,9 @@ export type TipRow = {
   downvotes: number | null;
   score: number | null;
   learning_metadata: Record<string, unknown> | null;
+  status?: string;
+  visibility?: string;
+  hidden_reason?: string | null;
   still_works_pct?: number | null;
   still_works_yes?: number | null;
   still_works_no?: number | null;
@@ -105,6 +108,9 @@ export function rowToTip(row: TipRow): Tutorial {
     stillWorksNo: Number(row.still_works_no ?? 0),
     outdated: row.is_outdated === true,
     patchesBehind: row.patches_behind ?? null,
+    status: row.status,
+    visibility: row.visibility,
+    hiddenReason: row.hidden_reason ?? null,
   };
 }
 

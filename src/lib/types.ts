@@ -84,6 +84,9 @@ export type Tutorial = {
   stillWorksNo?: number;
   outdated?: boolean;
   patchesBehind?: number | null;
+  status?: string;
+  visibility?: string;
+  hiddenReason?: string | null;
 };
 
 export type PathLesson = {

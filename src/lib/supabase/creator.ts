@@ -15,6 +15,7 @@ export type CreatorVideo = {
   video_url: string;
   video_path: string;
   status: "draft" | "published" | "hidden";
+  hidden_reason: string | null;
   visibility: "public" | "unlisted" | "private";
   views: number;
   likes_count: number;
@@ -43,7 +44,7 @@ export function useCreatorVideos() {
     const [videoResult, followerResult] = await Promise.all([
       supabase
         .from("videos")
-        .select("id,slug,title,game_id,category,topic,thumbnail_url,video_url,video_path,status,visibility,views,likes_count,saves_count,comments_count,duration_seconds,created_at,updated_at")
+        .select("id,slug,title,game_id,category,topic,thumbnail_url,video_url,video_path,status,hidden_reason,visibility,views,likes_count,saves_count,comments_count,duration_seconds,created_at,updated_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
       supabase

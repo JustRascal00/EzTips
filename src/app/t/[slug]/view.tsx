@@ -2,6 +2,7 @@
 
 import { FollowButton, PatchBadge, StillWorksControl, VoteControl } from "@/components/actions";
 import { CommentThread } from "@/components/Comments";
+import { ReportButton } from "@/components/ReportButton";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChampionIcon, TipRail } from "@/components/league";
 import { VideoPlayer } from "@/components/VideoPlayer";
@@ -13,7 +14,7 @@ import { useApp } from "@/lib/store";
 import { listTips } from "@/lib/tips";
 import type { Tutorial } from "@/lib/types";
 import { useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
-import { AlertTriangle, Bookmark, ChevronRight, Flag, Link2 } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronRight, EyeOff, Link2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -84,8 +85,18 @@ export function TutorialView({ tutorial: tip }: { tutorial: Tutorial }) {
             <button type="button" onClick={() => { navigator.clipboard?.writeText(window.location.href); toast("Link copied"); }} className={buttonClass("secondary", "md")}>
               <Link2 className="h-4 w-4" />Share
             </button>
-            <button type="button" onClick={() => toast("Reporting arrives with moderation")} className={buttonClass("ghost", "icon")} aria-label="Report"><Flag className="h-4 w-4" /></button>
+            <ReportButton target="tip" targetId={tip.id} compact />
           </div>
+
+          {tip.status === "hidden" && (
+            <div className="mt-5 flex gap-3 rounded-2xl border border-danger/30 bg-danger/10 p-4 text-sm text-red-100">
+              <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+              <p><b>Hidden by moderators.</b> Only you and moderators can see this tip.{tip.hiddenReason ? ` Reason: ${tip.hiddenReason}` : ""}</p>
+            </div>
+          )}
+          {tip.status === "draft" && (
+            <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 text-sm text-muted">This is a draft. Only you can see it. Publish it from Creator Studio.</div>
+          )}
 
           {tip.outdated && (
             <div className="mt-5 flex gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.08] p-4 text-sm text-amber-100">
