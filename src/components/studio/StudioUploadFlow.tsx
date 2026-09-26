@@ -1,151 +1,337 @@
 "use client";
 
-import { Button } from "@/components/ui";
-import { games } from "@/data/games";
+import { ChampionPicker, ChampionSlot } from "@/components/league";
+import { buttonClass, Segmented } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
+import { championSplashUrl } from "@/lib/ddragon/shared";
+import { ROLES } from "@/lib/league";
 import { createClient } from "@/lib/supabase/client";
 import { useApp } from "@/lib/store";
-import { AlertCircle, ArrowLeft, ArrowRight, Check, CheckCircle2, FileVideo2, ImageIcon, LoaderCircle, LockKeyhole, UploadCloud } from "lucide-react";
+import { listPatches, listTags, type PatchRow, type TagRow } from "@/lib/tips";
+import { useSupabaseQuery } from "@/lib/use-tips";
+import { AlertCircle, Check, CheckCircle2, Film, LoaderCircle, Plus, UploadCloud, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
-const steps = ["Upload video", "Video details", "Learning info", "Publish"];
-const inputCls = "w-full h-11 rounded-xl bg-elevated border border-border px-3 text-sm outline-none transition-colors focus:border-accent/60 placeholder:text-muted/60";
+const MAX_SECONDS = 60;
+const MAX_BYTES = 50 * 1024 * 1024;
+const inputCls = "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 text-sm outline-none transition-colors placeholder:text-muted/70 hover:border-white/[0.14] focus:border-accent/60";
+
 type Visibility = "public" | "unlisted" | "draft";
-type MetaField = { key: string; label: string; placeholder: string; options?: string[] };
+type Frame = { url: string; blob: Blob } | { url: string; blob: null; splash: true };
 
-function fieldsForGame(gameId: string): MetaField[] {
-  if (gameId === "lol") return [
-    { key: "character", label: "Champion", placeholder: "Ahri, Lee Sin…" }, { key: "role", label: "Lane / role", placeholder: "Choose a role", options: ["Top", "Jungle", "Mid", "ADC", "Support"] }, { key: "gameMode", label: "Game mode", placeholder: "Ranked, ARAM…" }, { key: "rankRelevance", label: "Rank relevance", placeholder: "Any rank, Emerald+…" }, { key: "version", label: "Patch", placeholder: "e.g. 26.16" },
-  ];
-  if (gameId === "valorant") return [
-    { key: "character", label: "Agent", placeholder: "Jett, Omen…" }, { key: "map", label: "Map", placeholder: "Ascent, Haven…" }, { key: "weapon", label: "Weapon", placeholder: "Vandal, Operator…" }, { key: "gameMode", label: "Game mode", placeholder: "Competitive, Swiftplay…" }, { key: "rankRelevance", label: "Rank relevance", placeholder: "Any rank, Ascendant+…" }, { key: "version", label: "Patch", placeholder: "Optional" },
-  ];
-  if (gameId === "cs2") return [
-    { key: "map", label: "Map", placeholder: "Mirage, Inferno…" }, { key: "weapon", label: "Weapon / utility", placeholder: "AK-47, Smoke…" }, { key: "gameMode", label: "Game mode", placeholder: "Competitive, Premier…" }, { key: "rankRelevance", label: "Rank relevance", placeholder: "Any rating, 15K+…" }, { key: "version", label: "Game version", placeholder: "Optional" },
-  ];
-  if (gameId === "minecraft") return [
-    { key: "gameMode", label: "Game mode", placeholder: "Survival, Creative…" }, { key: "technique", label: "Build / technique", placeholder: "Redstone, farm, PvP…" }, { key: "edition", label: "Edition", placeholder: "Choose an edition", options: ["Java", "Bedrock", "Both"] }, { key: "version", label: "Version", placeholder: "e.g. 1.21" },
-  ];
-  return [{ key: "character", label: "Character / hero", placeholder: "Optional" }, { key: "map", label: "Map", placeholder: "Optional" }, { key: "gameMode", label: "Game mode", placeholder: "Ranked, casual…" }, { key: "rankRelevance", label: "Rank relevance", placeholder: "Any rank…" }, { key: "version", label: "Patch / game version", placeholder: "Optional" }];
+/** Grab a few frames from a local video file to use as cover options. */
+async function captureFrames(src: string, duration: number): Promise<{ url: string; blob: Blob }[]> {
+  const video = document.createElement("video");
+  video.src = src;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  await new Promise<void>((resolve, reject) => {
+    video.onloadeddata = () => resolve();
+    video.onerror = () => reject(new Error("load"));
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 540;
+  canvas.height = 960;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return [];
+  const frames: { url: string; blob: Blob }[] = [];
+  for (const ratio of [0.12, 0.38, 0.62, 0.86]) {
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      video.currentTime = Math.max(0.1, duration * ratio);
+    });
+    // cover-crop to 9:16
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const scale = Math.max(canvas.width / vw, canvas.height / vh);
+    const w = vw * scale, h = vh * scale;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    if (blob) frames.push({ url: URL.createObjectURL(blob), blob });
+  }
+  video.removeAttribute("src");
+  video.load();
+  return frames;
 }
 
 export function StudioUploadFlow() {
   const { toast } = useApp();
   const { configured, user } = useAuth();
   const router = useRouter();
-  const [step, setStep] = useState(0);
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   const [duration, setDuration] = useState(0);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [frames, setFrames] = useState<{ url: string; blob: Blob }[]>([]);
+  const [cover, setCover] = useState(0);
+
+  const [champion, setChampion] = useState<{ id: string; name: string } | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [role, setRole] = useState<string>("any");
+  const [map, setMap] = useState<string>("sr");
+  const [patchId, setPatchId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [gameId, setGameId] = useState("lol");
-  const [topic, setTopic] = useState("");
-  const [tags, setTags] = useState("");
-  const [thumb, setThumb] = useState(0);
-  const [metadata, setMetadata] = useState<Record<string, string>>({});
+  const [points, setPoints] = useState<string[]>([""]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [skill, setSkill] = useState("intermediate");
   const [visibility, setVisibility] = useState<Visibility>("public");
-  const [publishing, setPublishing] = useState(false);
-  const [stage, setStage] = useState("");
+
   const [error, setError] = useState("");
-  const game = games.find((item) => item.id === gameId)!;
-  const metaFields = fieldsForGame(gameId);
-  const thumbnails = useMemo(() => [game?.banner, game?.characters[0]?.image, game?.characters[1]?.image].filter((item): item is string => Boolean(item)), [game]);
+  const [stage, setStage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const dropRef = useRef<HTMLLabelElement>(null);
+
+  const { data: patches } = useSupabaseQuery("upload-patches", (c) => listPatches(c, 10), [] as PatchRow[]);
+  const { data: tagOptions } = useSupabaseQuery("upload-tags", listTags, [] as TagRow[]);
+  const currentPatchId = patches.find((p) => p.is_current)?.id ?? patches[0]?.id ?? null;
+  const selectedPatch = patchId ?? currentPatchId;
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+  useEffect(() => () => frames.forEach((f) => URL.revokeObjectURL(f.url)), [frames]);
 
-  function chooseFile(nextFile: File) {
+  function chooseFile(next: File) {
     setError("");
-    if (!nextFile.type.startsWith("video/")) { setError("Choose a video file such as MP4, WebM, or MOV."); return; }
-    if (nextFile.size > 50 * 1024 * 1024) { setError("Keep video files under 50 MB."); return; }
+    if (!next.type.startsWith("video/")) return setError("Choose a video file (MP4, WebM or MOV).");
+    if (next.size > MAX_BYTES) return setError("Keep videos under 50 MB.");
     if (preview) URL.revokeObjectURL(preview);
-    setFile(nextFile); setPreview(URL.createObjectURL(nextFile));
+    setFrames([]);
+    setCover(0);
+    setDuration(0);
+    setFile(next);
+    setPreview(URL.createObjectURL(next));
   }
 
-  function next() {
-    setError("");
-    if (step === 0 && !file) { setError("Upload a video to continue."); return; }
-    if (step === 0 && duration > 180) { setError("Tips can be up to 3 minutes long."); return; }
-    if (step === 1 && title.trim().length < 3) { setError("Add a clear title with at least 3 characters."); return; }
-    if (step === 1 && !topic.trim()) { setError("Add a topic so players can discover the tip."); return; }
-    setStep((current) => Math.min(3, current + 1));
+  async function onMetadata(video: HTMLVideoElement) {
+    const d = video.duration || 0;
+    setDuration(d);
+    setSize({ w: video.videoWidth, h: video.videoHeight });
+    if (d > MAX_SECONDS + 0.5) { setError(`Tips can be at most ${MAX_SECONDS} seconds. This one is ${Math.round(d)}s. Trim it and try again.`); return; }
+    try { setFrames(await captureFrames(preview, d)); } catch { setFrames([]); }
   }
+
+  const tooLong = duration > MAX_SECONDS + 0.5;
+  const coverOptions: Frame[] = [...frames, ...(champion ? [{ url: championSplashUrl(champion.id), blob: null, splash: true } as const] : [])];
+  const missing = !file ? "Add a video" : tooLong ? "Video is too long" : !champion ? "Pick the champion" : title.trim().length < 3 ? "Add a title" : !selectedPatch ? "Pick the patch" : "";
 
   async function publish() {
-    if (!configured) { setError("Connect Supabase in .env.local before uploading real videos."); return; }
+    if (missing) { setError(missing); return; }
+    if (!configured) { setError("Connect Supabase in .env.local first."); return; }
     if (!user) { router.push("/auth?next=/studio/upload"); return; }
-    if (!file) { setStep(0); setError("Upload a video first."); return; }
-    setPublishing(true); setError(""); setStage("Uploading video…");
     const supabase = createClient();
-    if (!supabase) return;
-    const extension = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
-    const storagePath = `${user.id}/${crypto.randomUUID()}.${extension}`;
-    const { error: uploadError } = await supabase.storage.from("videos").upload(storagePath, file, { cacheControl: "3600", contentType: file.type, upsert: false });
-    if (uploadError) { setError(uploadError.message); setPublishing(false); return; }
-    const { data: publicFile } = supabase.storage.from("videos").getPublicUrl(storagePath);
-    const slugBase = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60) || "gaming-tip";
-    const slug = `${slugBase}-${crypto.randomUUID().slice(0, 8)}`;
-    setStage(visibility === "draft" ? "Saving draft…" : "Publishing tip…");
-    const normalizedTags = Array.from(new Map(
-      tags
-        .split(",")
-        .map((tag) => tag.trim().replace(/^#/, ""))
-        .filter(Boolean)
-        .map((tag) => [tag.toLocaleLowerCase(), tag] as const),
-    ).values()).slice(0, 12);
-    const { error: insertError } = await supabase.from("videos").insert({
-      user_id: user.id, slug, title: title.trim(), description: description.trim() || null, game_id: gameId,
-      category: topic.trim(), topic: topic.trim(), character: metadata.character?.trim() || null,
-      tags: normalizedTags,
-      skill_level: "intermediate", duration_seconds: Math.round(duration), video_path: storagePath,
-      video_url: publicFile.publicUrl, thumbnail_url: thumbnails[thumb] || null,
-      status: visibility === "draft" ? "draft" : "published", visibility: visibility === "draft" ? "private" : visibility,
-      learning_metadata: metadata,
-    });
-    if (insertError) { await supabase.storage.from("videos").remove([storagePath]); setError(insertError.message); setPublishing(false); return; }
-    toast(visibility === "draft" ? "Draft saved" : "Tip published"); router.push("/studio/content");
+    if (!supabase || !file || !champion) return;
+    setBusy(true); setError("");
+    const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
+    const videoPath = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    let thumbnailPath: string | null = null;
+    try {
+      setStage("Uploading video…");
+      const up = await supabase.storage.from("videos").upload(videoPath, file, { cacheControl: "3600", contentType: file.type, upsert: false });
+      if (up.error) throw new Error(up.error.message);
+
+      const chosen = coverOptions[cover];
+      if (chosen?.blob) {
+        setStage("Uploading cover…");
+        thumbnailPath = `${user.id}/${crypto.randomUUID()}.jpg`;
+        const coverUp = await supabase.storage.from("thumbnails").upload(thumbnailPath, chosen.blob, { contentType: "image/jpeg", upsert: false });
+        if (coverUp.error) thumbnailPath = null; // not fatal: falls back to champion splash
+      }
+
+      setStage("Checking the video and publishing…");
+      const res = await fetch("/api/tips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoPath,
+          thumbnailPath,
+          title,
+          description,
+          championId: champion.id,
+          roleId: role === "any" ? "" : role,
+          mapId: map,
+          patchId: selectedPatch,
+          topic: tags[0] ? tagOptions.find((t) => t.id === tags[0])?.name : "Tips",
+          tags: [champion.name, ...tags.map((id) => tagOptions.find((t) => t.id === id)?.name ?? id)],
+          takeaways: points,
+          skillLevel: skill,
+          visibility,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+      toast(visibility === "draft" ? "Draft saved" : "Tip published");
+      router.push(visibility === "draft" ? "/studio/content" : `/t/${data.slug}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+      setStage("");
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div><div className="text-xs font-bold uppercase tracking-[0.18em] text-accent">Upload workflow</div><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Create a new gaming tip</h1><p className="mt-2 text-sm text-muted">Share one useful moment. You can keep it unlisted or finish it later as a draft.</p></div>
-      <ol className="no-scrollbar mt-7 flex overflow-x-auto rounded-2xl border border-border bg-card p-2">{steps.map((label, index) => <li key={label} className="flex min-w-[145px] flex-1 items-center gap-2 px-3 py-2"><span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold", index < step ? "border-accent bg-accent text-white" : index === step ? "border-accent bg-accent/15 text-white" : "border-border text-muted")}>{index < step ? <Check className="h-3.5 w-3.5" /> : index + 1}</span><span className={cn("text-xs font-medium", index <= step ? "text-text" : "text-muted")}>{label}</span></li>)}</ol>
-      <div className="mt-6 rounded-2xl border border-border bg-card p-4 sm:p-6 lg:p-8">
-        {step === 0 && <UploadStep file={file} preview={preview} duration={duration} dimensions={dimensions} onFile={chooseFile} onMetadata={(video) => { setDuration(video.duration || 0); setDimensions({ width: video.videoWidth, height: video.videoHeight }); }} />}
-        {step === 1 && <DetailsStep title={title} setTitle={setTitle} description={description} setDescription={setDescription} gameId={gameId} setGameId={(value) => { setGameId(value); setMetadata({}); setThumb(0); }} topic={topic} setTopic={setTopic} tags={tags} setTags={setTags} thumbs={thumbnails} thumb={thumb} setThumb={setThumb} />}
-        {step === 2 && <LearningStep gameName={game.name} fields={metaFields} metadata={metadata} setMetadata={setMetadata} />}
-        {step === 3 && <PublishStep gameName={game.name} title={title} topic={topic} thumbnail={thumbnails[thumb]} visibility={visibility} setVisibility={setVisibility} duration={duration} />}
-        {error && <div role="alert" className="mt-6 flex gap-2 rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
-        {stage && !error && <div className="mt-6 flex gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-100">{publishing ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}{stage}</div>}
-        {!configured && step === 3 && <div className="mt-6 flex gap-2 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100"><AlertCircle className="h-4 w-4" />Backend setup is required before publishing. The Studio preview still works locally.</div>}
-        <div className="mt-8 flex items-center justify-between border-t border-border pt-5"><Button variant="ghost" disabled={step === 0 || publishing} onClick={() => { setError(""); setStep((current) => Math.max(0, current - 1)); }}><ArrowLeft className="h-4 w-4" />Back</Button>{step < 3 ? <Button onClick={next}>Continue<ArrowRight className="h-4 w-4" /></Button> : <Button disabled={publishing || !configured} onClick={publish}>{publishing && <LoaderCircle className="h-4 w-4 animate-spin" />}{visibility === "draft" ? "Save Draft" : "Publish Tip"}</Button>}</div>
+    <div className="mx-auto max-w-6xl pb-24">
+      <div>
+        <div className="text-xs font-bold uppercase tracking-[0.16em] text-accent">New tip</div>
+        <h1 className="display mt-1 text-4xl font-extrabold">Upload a tip</h1>
+        <p className="mt-1 text-sm text-muted">One useful moment, 60 seconds max. Vertical 9:16 looks best in the feed.</p>
       </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+        {/* ── Video + cover ──────────────────────── */}
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          {preview ? (
+            <div className="relative mx-auto aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-3xl border border-white/[0.08] bg-black">
+              <video src={preview} controls playsInline onLoadedMetadata={(e) => void onMetadata(e.currentTarget)} className="h-full w-full object-contain" />
+              <button type="button" onClick={() => { setFile(null); setPreview(""); setFrames([]); setDuration(0); setError(""); }} aria-label="Remove video" className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/80"><X className="h-4 w-4" /></button>
+              {duration > 0 && (
+                <span className={cn("absolute left-2 top-2 rounded-lg px-2 py-1 text-xs font-bold tabular backdrop-blur", tooLong ? "bg-danger text-white" : "bg-black/60 text-white")}>
+                  {Math.round(duration)}s / {MAX_SECONDS}s
+                </span>
+              )}
+            </div>
+          ) : (
+            <label
+              ref={dropRef}
+              onDragOver={(e) => { e.preventDefault(); dropRef.current?.classList.add("border-accent"); }}
+              onDragLeave={() => dropRef.current?.classList.remove("border-accent")}
+              onDrop={(e) => { e.preventDefault(); dropRef.current?.classList.remove("border-accent"); const f = e.dataTransfer.files[0]; if (f) chooseFile(f); }}
+              className="mx-auto flex aspect-[9/16] w-full max-w-[320px] cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-white/[0.12] bg-white/[0.02] p-6 text-center transition-colors hover:border-accent/60 hover:bg-accent/[0.04]"
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-2xl bg-accent/15 text-accent"><UploadCloud className="h-7 w-7" /></span>
+              <span className="mt-4 font-semibold">Drop your clip here</span>
+              <span className="mt-1 text-sm text-muted">or click to choose a file</span>
+              <span className="mt-5 rounded-full bg-white/[0.05] px-3 py-1.5 text-xs text-muted">MP4 / WebM / MOV · ≤ 60s · ≤ 50 MB</span>
+              <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) chooseFile(f); }} />
+            </label>
+          )}
+          {preview && size.w > size.h && !tooLong && <p className="rounded-xl border border-amber-400/20 bg-amber-400/[0.08] p-3 text-xs text-amber-100">This clip is horizontal. It works, but vertical 9:16 fills the feed.</p>}
+
+          {coverOptions.length > 0 && (
+            <div>
+              <div className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">Cover</div>
+              <div className="grid grid-cols-5 gap-2">
+                {coverOptions.map((f, i) => (
+                  <button key={f.url} type="button" onClick={() => setCover(i)} className={cn("relative aspect-[9/16] overflow-hidden rounded-lg border-2 transition", cover === i ? "border-accent" : "border-transparent opacity-70 hover:opacity-100")}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt={`Cover option ${i + 1}`} className="h-full w-full object-cover" />
+                    {cover === i && <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-accent"><Check className="h-2.5 w-2.5" /></span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Details ────────────────────────────── */}
+        <div className="space-y-5">
+          <Card title="What's it about">
+            <div className="flex flex-wrap items-start gap-5">
+              <div className="flex flex-col items-center gap-1">
+                <ChampionSlot id={champion?.id} name={champion?.name} size={72} highlight label="Champion" onClick={() => setPicking(true)} />
+              </div>
+              <div className="min-w-0 flex-1 space-y-3">
+                <Row label="Role"><Segmented size="sm" className="no-scrollbar max-w-full overflow-x-auto" value={role} onChange={setRole} options={[{ id: "any", label: "Any" }, ...ROLES.map((r) => ({ id: r.id, label: r.label }))]} /></Row>
+                <Row label="Map"><Segmented size="sm" value={map} onChange={setMap} options={[{ id: "sr", label: "Summoner's Rift" }, { id: "aram", label: "ARAM" }, { id: "arena", label: "Arena" }]} /></Row>
+                <Row label="Patch">
+                  <select value={selectedPatch ?? ""} onChange={(e) => setPatchId(Number(e.target.value))} className={cn(inputCls, "h-9 w-auto pr-8")}>
+                    {patches.map((p) => <option key={p.id} value={p.id}>{p.version}{p.is_current ? " (current)" : ""}</option>)}
+                  </select>
+                  <span className="text-xs text-muted">The patch you recorded on. Tips from old patches rank lower.</span>
+                </Row>
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Title & what players learn">
+            <Field label="Title" hint={`${title.length}/140`}>
+              <input maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Punish Zed the moment his W is down" className={cn(inputCls, "h-11")} />
+            </Field>
+            <Field label="Description" optional>
+              <textarea maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="When does this work, and what should players watch for?" className={cn(inputCls, "min-h-24 resize-y py-3")} />
+            </Field>
+            <Field label="Key points" optional>
+              <div className="space-y-2">
+                {points.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent/15 text-xs font-bold text-accent">{i + 1}</span>
+                    <input maxLength={200} value={p} onChange={(e) => setPoints((cur) => cur.map((x, n) => (n === i ? e.target.value : x)))} placeholder={["Wait for his shadow to be used", "Walk up and trade with Q + auto", "Back off before W is up again"][i] ?? "Another point"} className={cn(inputCls, "h-10")} />
+                    {points.length > 1 && <button type="button" onClick={() => setPoints((cur) => cur.filter((_, n) => n !== i))} aria-label="Remove point" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:text-white"><X className="h-4 w-4" /></button>}
+                  </div>
+                ))}
+                {points.length < 5 && <button type="button" onClick={() => setPoints((cur) => [...cur, ""])} className={buttonClass("ghost", "sm")}><Plus className="h-4 w-4" />Add point</button>}
+              </div>
+            </Field>
+          </Card>
+
+          <Card title="Tags & difficulty">
+            <div className="flex flex-wrap gap-2">
+              {tagOptions.map((t) => {
+                const on = tags.includes(t.id);
+                return (
+                  <button key={t.id} type="button" onClick={() => setTags((cur) => (on ? cur.filter((x) => x !== t.id) : [...cur, t.id].slice(0, 6)))} className={cn("h-8 rounded-full border px-3 text-xs font-semibold transition-colors", on ? "border-accent/60 bg-accent/15 text-white" : "border-white/[0.08] bg-white/[0.03] text-muted hover:text-white")}>
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            <Row label="Difficulty"><Segmented size="sm" value={skill} onChange={setSkill} options={[{ id: "beginner", label: "Beginner" }, { id: "intermediate", label: "Intermediate" }, { id: "advanced", label: "Advanced" }]} /></Row>
+          </Card>
+
+          <Card title="Who can see it">
+            <Segmented value={visibility} onChange={setVisibility} options={[{ id: "public", label: "Public" }, { id: "unlisted", label: "Unlisted" }, { id: "draft", label: "Draft" }]} />
+            <p className="text-xs text-muted">{visibility === "public" ? "Shows in the feed, search and on the champion page." : visibility === "unlisted" ? "Only people with the link can watch it." : "Saved privately in your Studio."}</p>
+          </Card>
+
+          {error && <div role="alert" className="flex gap-2 rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>}
+          {stage && !error && <div className="flex items-center gap-2 rounded-xl border border-accent/25 bg-accent/10 p-3 text-sm text-white"><LoaderCircle className="h-4 w-4 animate-spin text-accent" />{stage}</div>}
+
+          <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-panel/95 p-3 shadow-2xl shadow-black/50 backdrop-blur">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
+              {missing ? <><Film className="h-4 w-4 shrink-0 text-muted" /><span className="truncate text-muted">{missing}</span></> : <><CheckCircle2 className="h-4 w-4 shrink-0 text-success" /><span className="truncate">Ready to {visibility === "draft" ? "save" : "publish"}</span></>}
+            </div>
+            <button type="button" disabled={busy || Boolean(missing)} onClick={publish} className={buttonClass("primary", "md")}>
+              {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{visibility === "draft" ? "Save draft" : "Publish tip"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ChampionPicker open={picking} onClose={() => setPicking(false)} title="Which champion?" onPick={(c) => { setChampion({ id: c.id, name: c.name }); setPicking(false); }} />
     </div>
   );
 }
 
-function UploadStep({ file, preview, duration, dimensions, onFile, onMetadata }: { file: File | null; preview: string; duration: number; dimensions: { width: number; height: number }; onFile: (f: File) => void; onMetadata: (v: HTMLVideoElement) => void }) {
-  return <div><StepTitle title="Upload your video" description="Short, focused gameplay tips work best in a vertical format." />{preview ? <div className="grid gap-6 md:grid-cols-[230px_1fr]"><div className="mx-auto aspect-[9/16] w-full max-w-[230px] overflow-hidden rounded-2xl bg-black"><video src={preview} controls onLoadedMetadata={(event) => onMetadata(event.currentTarget)} className="h-full w-full object-contain" /></div><div className="space-y-4"><div className="rounded-xl border border-border bg-elevated p-4"><div className="flex gap-3"><FileVideo2 className="h-5 w-5 shrink-0 text-accent" /><div className="min-w-0"><div className="truncate text-sm font-semibold">{file?.name}</div><div className="mt-1 text-xs text-muted">{file ? (file.size / 1024 / 1024).toFixed(1) : 0} MB · {Math.round(duration)} sec{dimensions.width ? ` · ${dimensions.width}×${dimensions.height}` : ""}</div></div></div></div>{dimensions.width > dimensions.height && <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">This video is horizontal. It can still be uploaded, but 9:16 vertical video works best in the feed.</div>}<FilePicker label="Replace video" onFile={onFile} /></div></div> : <label onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const next = e.dataTransfer.files[0]; if (next) onFile(next); }} className="flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-accent/40 bg-accent/[0.04] p-6 text-center hover:bg-accent/[0.07]"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15 text-accent"><UploadCloud className="h-7 w-7" /></div><div className="mt-4 font-semibold">Drop a vertical gaming video here</div><div className="mt-1 text-sm text-muted">or click to select a file</div><div className="mt-5 rounded-full bg-elevated px-3 py-1.5 text-xs text-muted">9:16 · 15 seconds–3 minutes · up to 50 MB</div><input type="file" accept="video/*" className="hidden" onChange={(e) => { const next = e.target.files?.[0]; if (next) onFile(next); }} /></label>}</div>;
+function Card({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-white/[0.06] bg-panel p-5">
+      <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">{title}</h2>
+      {children}
+    </section>
+  );
 }
 
-function FilePicker({ label, onFile }: { label: string; onFile: (f: File) => void }) { return <label className="inline-flex h-10 cursor-pointer items-center rounded-xl border border-border px-4 text-sm font-semibold hover:bg-hover">{label}<input type="file" accept="video/*" className="hidden" onChange={(e) => { const next = e.target.files?.[0]; if (next) onFile(next); }} /></label>; }
-
-type DetailsProps = { title: string; setTitle: (v: string) => void; description: string; setDescription: (v: string) => void; gameId: string; setGameId: (v: string) => void; topic: string; setTopic: (v: string) => void; tags: string; setTags: (v: string) => void; thumbs: string[]; thumb: number; setThumb: (v: number) => void };
-function DetailsStep(props: DetailsProps) {
-  return <div><StepTitle title="Add video details" description="Clear metadata helps the right players discover your tip." /><div className="grid gap-5"><Field label="Title" hint={`${props.title.length}/140`}><input maxLength={140} value={props.title} onChange={(e) => props.setTitle(e.target.value)} placeholder="Easy Mirage window smoke from spawn" className={inputCls} /></Field><Field label="Description" optional><textarea maxLength={1000} value={props.description} onChange={(e) => props.setDescription(e.target.value)} placeholder="Explain what players will learn and when to use it." className={`${inputCls} min-h-28 resize-y py-3`} /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Game"><select value={props.gameId} onChange={(e) => props.setGameId(e.target.value)} className={inputCls}>{games.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field><Field label="Topic / category"><input value={props.topic} onChange={(e) => props.setTopic(e.target.value)} placeholder="Smoke lineup, Mid lane, Redstone…" className={inputCls} /></Field></div><Field label="Tags" optional><input value={props.tags} onChange={(e) => props.setTags(e.target.value)} placeholder="Mirage, Smoke, Lineup, Utility" className={inputCls} /><p className="mt-2 text-xs text-muted">Separate tags with commas. They help recommendations behind the scenes.</p></Field>{props.thumbs.length > 0 && <Field label="Cover image"><div className="flex gap-3 overflow-x-auto pb-1">{props.thumbs.map((src, index) => <button key={src} type="button" onClick={() => props.setThumb(index)} className={cn("relative aspect-video w-36 shrink-0 overflow-hidden rounded-xl border-2", props.thumb === index ? "border-accent" : "border-transparent")}><img src={src} alt={`Cover option ${index + 1}`} className="h-full w-full object-cover" />{props.thumb === index && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-accent"><Check className="h-3 w-3" /></span>}</button>)}</div></Field>}</div></div>;
+function Row({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className="w-20 shrink-0 text-sm font-medium text-white/80">{label}</span>
+      {children}
+    </div>
+  );
 }
 
-function LearningStep({ gameName, fields, metadata, setMetadata }: { gameName: string; fields: MetaField[]; metadata: Record<string, string>; setMetadata: (v: Record<string, string>) => void }) {
-  return <div><StepTitle title={`Add ${gameName} context`} description="These optional fields change with the selected game and make specific tips easier to understand." /><div className="grid gap-5 sm:grid-cols-2">{fields.map((field) => <Field key={field.key} label={field.label} optional>{field.options ? <select value={metadata[field.key] || ""} onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })} className={inputCls}><option value="">Not specified</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select> : <input value={metadata[field.key] || ""} onChange={(e) => setMetadata({ ...metadata, [field.key]: e.target.value })} placeholder={field.placeholder} className={inputCls} />}</Field>)}</div><div className="mt-6 rounded-xl border border-border bg-elevated p-4 text-sm text-muted"><strong className="text-text">Optional by design.</strong> Players discover topics through the feed; this metadata improves recommendations without turning onboarding into a questionnaire.</div></div>;
+function Field({ label, hint, optional, children }: { label: string; hint?: string; optional?: boolean; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-sm font-medium">
+        <span>{label}{optional && <span className="ml-1 font-normal text-muted">(optional)</span>}</span>
+        {hint && <span className="text-xs font-normal text-muted tabular">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
 }
-
-function PublishStep({ gameName, title, topic, thumbnail, visibility, setVisibility, duration }: { gameName: string; title: string; topic: string; thumbnail?: string; visibility: Visibility; setVisibility: (v: Visibility) => void; duration: number }) {
-  const options: { id: Visibility; title: string; description: string; icon: typeof CheckCircle2 }[] = [{ id: "public", title: "Public", description: "Visible in eligible feeds, search, and your creator profile.", icon: CheckCircle2 }, { id: "unlisted", title: "Unlisted", description: "Only people with the direct link can watch it.", icon: LockKeyhole }, { id: "draft", title: "Draft", description: "Save privately and publish when you are ready.", icon: FileVideo2 }];
-  return <div><StepTitle title="Choose how to publish" description="Review the tip, then decide who can see it." /><div className="grid gap-3 md:grid-cols-3">{options.map((option) => <button key={option.id} onClick={() => setVisibility(option.id)} type="button" className={cn("rounded-2xl border p-4 text-left transition-colors", visibility === option.id ? "border-accent bg-accent/10" : "border-border bg-elevated hover:bg-hover")}><div className="flex items-center justify-between"><option.icon className={cn("h-5 w-5", visibility === option.id ? "text-accent" : "text-muted")} />{visibility === option.id && <Check className="h-4 w-4 text-accent" />}</div><div className="mt-4 font-semibold">{option.title}</div><p className="mt-1 text-xs leading-5 text-muted">{option.description}</p></button>)}</div><div className="mt-7 grid gap-5 rounded-2xl border border-border bg-elevated p-4 sm:grid-cols-[180px_1fr]">{thumbnail ? <div className="aspect-video overflow-hidden rounded-xl"><img src={thumbnail} alt="Selected cover" className="h-full w-full object-cover" /></div> : <div className="flex aspect-video items-center justify-center rounded-xl bg-card text-muted"><ImageIcon className="h-6 w-6" /></div>}<div><div className="text-xs font-bold uppercase tracking-wider text-accent">{gameName} · {topic}</div><h3 className="mt-2 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm text-muted">{Math.round(duration)} sec · {visibility === "draft" ? "Private draft" : `${visibility[0].toUpperCase()}${visibility.slice(1)} tip`}</p></div></div></div>;
-}
-
-function StepTitle({ title, description }: { title: string; description: string }) { return <div className="mb-6"><h2 className="text-xl font-bold sm:text-2xl">{title}</h2><p className="mt-1 text-sm text-muted">{description}</p></div>; }
-function Field({ label, hint, optional, children }: { label: string; hint?: string; optional?: boolean; children: ReactNode }) { return <label className="block"><span className="mb-2 flex items-center justify-between text-sm font-medium"><span>{label}{optional && <span className="ml-1 font-normal text-muted">(optional)</span>}</span>{hint && <span className="text-xs font-normal text-muted">{hint}</span>}</span>{children}</label>; }

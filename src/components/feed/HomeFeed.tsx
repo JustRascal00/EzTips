@@ -69,10 +69,10 @@ function FeedItem({ tip, active, onActivate, onOpenComments }: { tip: Tutorial; 
     <section ref={ref} data-feed-item className="snap-item relative flex h-full items-center justify-center md:py-4">
       <div className="relative h-full md:h-[calc(100%-0.5rem)]">
         <article className="relative h-full w-screen overflow-hidden bg-black md:aspect-[9/16] md:w-auto md:max-w-[calc(100vw-9rem)] md:rounded-[28px] md:border md:border-white/[0.06] md:shadow-[0_30px_90px_rgba(0,0,0,.6)]">
-          <VideoPlayer src={tip.videoUrl} poster={tip.thumbnail} active={active} onEnded={() => recordVideoComplete(tip.id)} vertical className="absolute inset-0 h-full w-full" />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-t from-black via-black/60 to-transparent" />
+          <VideoPlayer minimal src={tip.videoUrl} poster={tip.thumbnail} active={active} onEnded={() => recordVideoComplete(tip.id)} className="absolute inset-0 h-full w-full" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[50%] bg-gradient-to-t from-black via-black/60 to-transparent" />
 
-          <div className="absolute inset-x-4 bottom-5 z-20 pr-16 md:inset-x-5 md:pr-2">
+          <div className="pointer-events-none absolute inset-x-4 bottom-7 z-20 pr-16 md:inset-x-5 md:pr-12 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
             <div className="flex flex-wrap items-center gap-1.5">
               {tip.championId && (
                 <Link href={`/champions/${tip.championId}`} className="inline-flex items-center gap-1.5 rounded-lg bg-black/50 py-0.5 pl-0.5 pr-2 text-xs font-bold text-white backdrop-blur hover:bg-black/70">

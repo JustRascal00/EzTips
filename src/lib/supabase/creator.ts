@@ -77,9 +77,10 @@ export function useCreatorVideos() {
   const deleteVideo = useCallback(async (video: CreatorVideo) => {
     const supabase = createClient();
     if (!supabase) return;
-    if (video.video_path) await supabase.storage.from("videos").remove([video.video_path]);
+    // Row first: if that fails, the file is still there and the tip keeps working.
     const { error: deleteError } = await supabase.from("videos").delete().eq("id", video.id);
     if (deleteError) throw deleteError;
+    if (video.video_path) await supabase.storage.from("videos").remove([video.video_path]);
     await refresh();
   }, [refresh]);
 

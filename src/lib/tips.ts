@@ -241,6 +241,24 @@ export async function championTipCounts(client: SupabaseClient) {
   return counts;
 }
 
+export type PatchRow = { id: number; version: string; ddragon_version: string; is_current: boolean };
+
+/** Patches, newest first. */
+export async function listPatches(client: SupabaseClient, limit = 12) {
+  const { data, error } = await client.from("patches").select("id,version,ddragon_version,is_current").limit(200);
+  if (error) throw error;
+  const ord = (v: string) => { const [a, b] = v.split(".").map(Number); return a * 100 + b; };
+  return ((data ?? []) as PatchRow[]).sort((a, b) => ord(b.version) - ord(a.version)).slice(0, limit);
+}
+
+export type TagRow = { id: string; name: string; kind: string };
+
+export async function listTags(client: SupabaseClient) {
+  const { data, error } = await client.from("tags").select("id,name,kind").order("sort");
+  if (error) throw error;
+  return (data ?? []) as TagRow[];
+}
+
 export async function getCurrentPatch(client: SupabaseClient) {
   const { data } = await client.from("patches").select("id,version,ddragon_version").eq("is_current", true).maybeSingle();
   return (data ?? null) as { id: number; version: string; ddragon_version: string } | null;
