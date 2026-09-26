@@ -1,15 +1,16 @@
 "use client";
 
-import { ItemDetails, ItemIcon, RuneIcon, SkillGrid, SpellIcon } from "@/components/builds";
+import { RuneIcon, SkillGrid, SpellIcon } from "@/components/builds";
+import { ItemsSection } from "@/components/item-shop";
 import { ChampionIcon, ChampionPicker, ChampionSlot } from "@/components/league";
 import { buttonClass, Segmented } from "@/components/ui";
 import { standardSkillOrder, usePatchData, type Build } from "@/lib/builds";
-import { emptyRunes, MAP_SPELL_MODE, type BuildItem, type BuildRunes } from "@/lib/builds-data";
+import { emptyRunes, MAP_SPELL_MODE, type BuildRunes } from "@/lib/builds-data";
 import { cn } from "@/lib/cn";
 import { ROLES } from "@/lib/league";
 import { useApp } from "@/lib/store";
 import { useChampions } from "@/lib/use-tips";
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, Search, X } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
@@ -17,17 +18,6 @@ import { useMemo, useState, type ReactNode } from "react";
 type Group = "starting" | "core" | "situational";
 const LIMITS: Record<Group, number> = { starting: 4, core: 6, situational: 6 };
 const inputCls = "w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3.5 text-sm outline-none transition-colors hover:border-white/[0.14] focus:border-accent/60";
-
-type ItemFilter = "legendary" | "boots" | "starter" | "components" | "consumables" | "all";
-const itemFilters: Record<ItemFilter, (i: BuildItem) => boolean> = {
-  // Finished items: 2000g+ and not boots. Includes items that still upgrade later (e.g. Manamune → Muramana).
-  legendary: (i) => i.gold >= 2000 && !i.tags.includes("Boots"),
-  boots: (i) => i.tags.includes("Boots"),
-  starter: (i) => i.gold <= 500 && i.into.length === 0 && !i.tags.includes("Consumable"),
-  components: (i) => i.into.length > 0 && !i.tags.includes("Boots"),
-  consumables: (i) => i.tags.includes("Consumable") || i.tags.includes("Trinket"),
-  all: () => true,
-};
 
 export function BuildEditor({ initial, championId: initialChampion, roleId: initialRole, mapId: initialMap }: { initial?: Build; championId?: string; roleId?: string; mapId?: string }) {
   const router = useRouter();
@@ -48,36 +38,44 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
   const [runes, setRunes] = useState<BuildRunes>(initial?.runes ?? emptyRunes());
   const [spells, setSpells] = useState<string[]>(initial?.spells ?? []);
   const [skillOrder, setSkillOrder] = useState<string[]>(initial?.skillOrder?.length ? initial.skillOrder : Array(18).fill(""));
-  const [itemQuery, setItemQuery] = useState("");
-  const [itemFilter, setItemFilter] = useState<ItemFilter>("legendary");
-  const [inspect, setInspect] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const { data, error: dataError, loading } = usePatchData(mapId, championId || undefined);
   const champion = champions.find((c) => c.id === championId);
 
-  const items = useMemo(() => {
-    if (!data) return [];
-    const q = itemQuery.trim().toLowerCase();
-    return data.items.filter((i) => (q ? i.name.toLowerCase().includes(q) : itemFilters[itemFilter](i)));
-  }, [data, itemQuery, itemFilter]);
-
   const spellOptions = useMemo(() => data?.spells.filter((s) => s.modes.includes(MAP_SPELL_MODE[mapId])) ?? [], [data, mapId]);
   const trees = data?.runeTrees ?? [];
   const primary = trees.find((t) => t.id === runes.primary);
   const secondary = trees.find((t) => t.id === runes.secondary);
 
-  function addItem(id: string) {
+  function addItem(id: string, group: Group) {
     setGroups((g) => {
-      const list = g[activeGroup];
-      if (list.length >= LIMITS[activeGroup]) { toast(`Max ${LIMITS[activeGroup]} ${activeGroup} items`); return g; }
-      if (activeGroup === "core" && list.includes(id)) return g;
-      const next = { ...g, [activeGroup]: [...list, id] };
-      if (activeGroup === "starting" && next.starting.length >= 2 && next.core.length === 0) setActiveGroup("core");
+      const list = g[group];
+      if (list.length >= LIMITS[group]) { toast(`Max ${LIMITS[group]} ${group} items`); return g; }
+      if (group === "core" && list.includes(id)) return g;
+      const next = { ...g, [group]: [...list, id] };
+      if (group === "core" && next.core.length === LIMITS.core) setActiveGroup("situational");
       return next;
     });
   }
+  /** Put an item into a group (optionally at a position), moving it if it came from another slot. */
+  function placeItem(id: string, group: Group, index?: number, from?: { group: Group; index: number }) {
+    setGroups((g) => {
+      const next: Record<Group, string[]> = { starting: [...g.starting], core: [...g.core], situational: [...g.situational] };
+      if (from) next[from.group].splice(from.index, 1);
+      const list = next[group];
+      if (list.length >= LIMITS[group]) { toast(`${group[0].toUpperCase()}${group.slice(1)} is full (${LIMITS[group]} items)`); return g; }
+      if (group === "core" && list.includes(id)) { toast("Already in your core items"); return g; }
+      // moving right within the same box: the removal above shifted everything one slot left
+      const target = index !== undefined && from && from.group === group && from.index < index ? index - 1 : index;
+      const at = target === undefined ? list.length : Math.min(target, list.length);
+      list.splice(at, 0, id);
+      return next;
+    });
+    setActiveGroup(group);
+  }
+
   const removeItem = (group: Group, index: number) => setGroups((g) => ({ ...g, [group]: g[group].filter((_, i) => i !== index) }));
   const moveItem = (group: Group, index: number, dir: -1 | 1) => setGroups((g) => {
     const list = [...g[group]];
@@ -127,7 +125,7 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
   }
 
   return (
-    <div className="mx-auto max-w-6xl pb-28 pt-6">
+    <div className="mx-auto max-w-7xl pb-28 pt-6">
       <Link href={championId ? `/champions/${championId}#builds` : "/"} className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-white"><ArrowLeft className="h-4 w-4" />{champion ? `${champion.name} builds` : "Back"}</Link>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <h1 className="display text-4xl font-extrabold">{initial ? "Edit build" : "Create a build"}</h1>
@@ -135,8 +133,7 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
       </div>
       {dataError && <div className="mt-4 rounded-xl border border-danger/30 bg-danger/10 p-3 text-sm text-red-200">{dataError}</div>}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-5">
+      <div className="mt-6 space-y-5">
           <Card title="Basics">
             <div className="flex flex-wrap items-start gap-5">
               <ChampionSlot id={championId || null} name={champion?.name} size={72} highlight label="Champion" onClick={() => !initial && setPicking(true)} />
@@ -149,60 +146,22 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
           </Card>
 
           <Card title="Items">
-            <div className="space-y-3">
-              {(["starting", "core", "situational"] as Group[]).map((g) => (
-                <button key={g} type="button" onClick={() => setActiveGroup(g)} className={cn("flex w-full flex-wrap items-center gap-2 rounded-xl border p-2.5 text-left transition-colors", activeGroup === g ? "border-accent/60 bg-accent/[0.07]" : "border-white/[0.06] hover:border-white/[0.14]")}>
-                  <span className="w-24 shrink-0 text-xs font-bold uppercase tracking-wider text-muted">{g}{g === "core" && <span className="block normal-case tracking-normal text-[10px]">in buy order</span>}</span>
-                  {groups[g].map((id, i) => (
-                    <span key={`${id}-${i}`} className="group relative">
-                      <ItemIcon id={id} data={data} size={40} />
-                      <span className="absolute -right-1.5 -top-1.5 hidden gap-0.5 group-hover:flex">
-                        {g === "core" && i > 0 && <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); moveItem(g, i, -1); }} className="grid h-4 w-4 place-items-center rounded-full bg-panel text-white"><ArrowLeft className="h-2.5 w-2.5" /></span>}
-                        {g === "core" && i < groups[g].length - 1 && <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); moveItem(g, i, 1); }} className="grid h-4 w-4 place-items-center rounded-full bg-panel text-white"><ArrowRight className="h-2.5 w-2.5" /></span>}
-                        <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); removeItem(g, i); }} className="grid h-4 w-4 place-items-center rounded-full bg-danger text-white"><X className="h-2.5 w-2.5" /></span>
-                      </span>
-                    </span>
-                  ))}
-                  {groups[g].length < LIMITS[g] && <span className="grid h-10 w-10 place-items-center rounded-lg border border-dashed border-white/15 text-xs text-muted">+</span>}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                <input value={itemQuery} onChange={(e) => setItemQuery(e.target.value)} placeholder="Search items…" className={cn(inputCls, "h-9 pl-9")} />
-              </label>
-              {!itemQuery && <Segmented size="sm" value={itemFilter} onChange={setItemFilter} className="no-scrollbar max-w-full overflow-x-auto" options={[{ id: "legendary", label: "Legendary" }, { id: "boots", label: "Boots" }, { id: "starter", label: "Starter" }, { id: "components", label: "Components" }, { id: "consumables", label: "Potions & wards" }, { id: "all", label: `All (${data?.items.length ?? 0})` }]} />}
-            </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_260px]">
-              <div className="grid max-h-80 grid-cols-6 content-start gap-1.5 overflow-y-auto pr-1 sm:grid-cols-8 md:grid-cols-7 xl:grid-cols-8">
-                {loading && !data ? Array.from({ length: 24 }, (_, i) => <div key={i} className="shimmer aspect-square rounded-lg" />) : items.map((i) => (
-                  <button
-                    key={i.id}
-                    type="button"
-                    onClick={() => { addItem(i.id); setInspect(i.id); }}
-                    onMouseEnter={() => setInspect(i.id)}
-                    onFocus={() => setInspect(i.id)}
-                    aria-label={`Add ${i.name}`}
-                    className={cn("aspect-square rounded-lg transition hover:scale-105 hover:ring-2 hover:ring-accent/70", inspect === i.id && "ring-2 ring-accent/70")}
-                  >
-                    <ItemIcon id={i.id} data={data} size={44} noTooltip className="!h-full !w-full" />
-                  </button>
-                ))}
-              </div>
-              {/* item inspector */}
-              <div className="min-h-40 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3.5 md:sticky md:top-0">
-                {(() => {
-                  const item = data?.items.find((x) => x.id === inspect);
-                  return item && data
-                    ? <ItemDetails item={item} version={data.version} />
-                    : <p className="text-sm text-muted">Hover or tap an item to see what it does.</p>;
-                })()}
-              </div>
-            </div>
-            <p className="text-xs text-muted">Click an item to add it to <b className="text-white">{activeGroup}</b>. Hover an added item to reorder or remove it.</p>
+            <ItemsSection
+              data={data}
+              loading={loading}
+              groups={groups}
+              limits={LIMITS}
+              activeGroup={activeGroup}
+              setActiveGroup={setActiveGroup}
+              onAdd={addItem}
+              onRemove={removeItem}
+              onMove={moveItem}
+              onPlace={placeItem}
+            />
           </Card>
 
+        <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
+          <div className="space-y-5">
           <Card title="Skill order">
             <div className="flex flex-wrap gap-1.5">
               {[["Q", "W", "E"], ["Q", "E", "W"], ["W", "Q", "E"], ["W", "E", "Q"], ["E", "Q", "W"], ["E", "W", "Q"]].map((p) => (
@@ -220,10 +179,8 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
           <Card title="Notes (optional)">
             <textarea maxLength={2000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="When to go situational items, matchups this is good in, how to play the power spikes…" className={cn(inputCls, "min-h-28 resize-y py-3")} />
           </Card>
-        </div>
-
-        {/* right column: runes + spells */}
-        <div className="space-y-5 lg:sticky lg:top-20 lg:self-start">
+          </div>
+          <div className="space-y-5">
           <Card title="Runes">
             <div className="flex gap-2">
               {trees.map((t) => (
@@ -291,12 +248,13 @@ export function BuildEditor({ initial, championId: initialChampion, roleId: init
               })}
             </div>
           </Card>
+          </div>
         </div>
       </div>
 
       {/* sticky save bar */}
       <div className="fixed inset-x-0 bottom-16 z-40 px-4 md:bottom-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-panel/95 p-3 shadow-2xl shadow-black/60 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-panel/95 p-3 shadow-2xl shadow-black/60 backdrop-blur">
           <div className="flex min-w-0 items-center gap-2 text-sm">
             {champion && <ChampionIcon id={champion.id} size={28} className="rounded-lg" />}
             {error ? <><AlertCircle className="h-4 w-4 shrink-0 text-danger" /><span className="truncate text-red-200">{error}</span></>
