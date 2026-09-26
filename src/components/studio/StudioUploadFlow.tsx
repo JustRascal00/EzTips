@@ -1,7 +1,7 @@
 "use client";
 
 import { ChampionPicker, ChampionSlot } from "@/components/league";
-import { buttonClass, Segmented } from "@/components/ui";
+import { buttonClass, Segmented, Select } from "@/components/ui";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { championSplashUrl } from "@/lib/ddragon/shared";
@@ -238,9 +238,14 @@ export function StudioUploadFlow() {
                 <Row label="Role"><Segmented size="sm" className="no-scrollbar max-w-full overflow-x-auto" value={role} onChange={setRole} options={[{ id: "any", label: "Any" }, ...ROLES.map((r) => ({ id: r.id, label: r.label }))]} /></Row>
                 <Row label="Map"><Segmented size="sm" value={map} onChange={setMap} options={[{ id: "sr", label: "Summoner's Rift" }, { id: "aram", label: "ARAM" }, { id: "arena", label: "Arena" }]} /></Row>
                 <Row label="Patch">
-                  <select value={selectedPatch ?? ""} onChange={(e) => setPatchId(Number(e.target.value))} className={cn(inputCls, "h-9 w-auto pr-8")}>
-                    {patches.map((p) => <option key={p.id} value={p.id}>{p.version}{p.is_current ? " (current)" : ""}</option>)}
-                  </select>
+                  <Select
+                    size="sm"
+                    ariaLabel="Patch"
+                    className="w-40"
+                    value={String(selectedPatch ?? "")}
+                    onChange={(v) => setPatchId(Number(v))}
+                    options={patches.map((p) => ({ id: String(p.id), label: `Patch ${p.version}`, hint: p.is_current ? "current" : undefined }))}
+                  />
                   <span className="text-xs text-muted">The patch you recorded on. Tips from old patches rank lower.</span>
                 </Row>
               </div>

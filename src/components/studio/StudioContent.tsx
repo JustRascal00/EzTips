@@ -66,7 +66,7 @@ function Thumb({ video }: { video: CreatorVideo }) { return <div className="h-14
 
 function VisibilityControl({ video, busy, onChange }: { video: CreatorVideo; busy: boolean; onChange: RowProps["onVisibility"] }) {
   const value = video.status === "draft" ? "draft" : video.visibility;
-  return <select aria-label={`Visibility for ${video.title}`} disabled={busy} value={value} onChange={(event) => onChange(video, event.target.value as "public" | "unlisted" | "draft")} className="h-9 rounded-lg border border-border bg-elevated px-2 text-xs outline-none focus:border-accent"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="draft">Draft</option></select>;
+  return <select aria-label={`Visibility for ${video.title}`} disabled={busy} value={value} onChange={(event) => onChange(video, event.target.value as "public" | "unlisted" | "draft")} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-xs font-semibold text-text outline-none focus:border-accent/60"><option value="public">Public</option><option value="unlisted">Unlisted</option><option value="draft">Draft</option></select>;
 }
 
 function Actions({ video, busy, onDelete }: { video: CreatorVideo; busy: boolean; onDelete: (v: CreatorVideo) => void }) {

@@ -3,7 +3,6 @@
 import { cn } from "@/lib/cn";
 import {
   useEffect,
-  useId,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -370,6 +369,103 @@ export function Chip({
   );
 }
 
+/** Dark, styled dropdown (replaces the browser's native <select> menu). */
+export function Select<T extends string>({
+  value,
+  onChange,
+  options,
+  className,
+  ariaLabel,
+  size = "md",
+  disabled,
+  align = "left",
+}: {
+  value: T;
+  onChange: (id: T) => void;
+  options: { id: T; label: ReactNode; hint?: ReactNode }[];
+  className?: string;
+  ariaLabel?: string;
+  size?: "sm" | "md";
+  disabled?: boolean;
+  align?: "left" | "right";
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.id === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    listRef.current?.querySelector<HTMLElement>("[data-active='true']")?.scrollIntoView({ block: "nearest" });
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, active]);
+
+  const openList = () => { setActive(Math.max(0, options.findIndex((o) => o.id === value))); setOpen(true); };
+  const pick = (id: T) => { onChange(id); setOpen(false); };
+
+  return (
+    <div ref={ref} className={cn("relative inline-block", className)}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : openList())}
+        onKeyDown={(e) => {
+          if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) { e.preventDefault(); openList(); return; }
+          if (!open) return;
+          if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+          if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(options.length - 1, a + 1)); }
+          if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); const o = options[active]; if (o) pick(o.id); }
+        }}
+        className={cn(
+          "inline-flex w-full items-center justify-between gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] font-medium text-text outline-none transition-colors hover:border-white/[0.14] focus-visible:border-accent/60 disabled:opacity-50",
+          size === "sm" ? "h-9 px-3 text-[13px]" : "h-10 px-3.5 text-sm",
+          open && "border-accent/60",
+        )}
+      >
+        <span className="truncate">{selected?.label ?? "Select…"}</span>
+        <svg viewBox="0 0 20 20" className={cn("h-4 w-4 shrink-0 text-muted transition-transform", open && "rotate-180")} fill="currentColor" aria-hidden><path d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z" /></svg>
+      </button>
+      {open && (
+        <div
+          ref={listRef}
+          role="listbox"
+          className={cn(
+            "absolute top-full z-[60] mt-1.5 max-h-72 min-w-full overflow-y-auto rounded-xl border border-white/[0.08] bg-panel p-1 shadow-2xl shadow-black/60 pop-in",
+            align === "right" ? "right-0" : "left-0",
+          )}
+        >
+          {options.map((o, i) => (
+            <button
+              key={o.id}
+              type="button"
+              role="option"
+              aria-selected={o.id === value}
+              data-active={i === active}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(o.id)}
+              className={cn(
+                "flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-sm",
+                i === active ? "bg-white/[0.07] text-white" : "text-white/80",
+              )}
+            >
+              <span className="w-4 shrink-0 text-accent">{o.id === value && <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden><path d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" /></svg>}</span>
+              <span className="flex-1">{o.label}</span>
+              {o.hint && <span className="text-xs text-muted">{o.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FilterSelect({
   label,
   value,
@@ -381,22 +477,10 @@ export function FilterSelect({
   options: { id: string; label: string }[];
   onChange: (id: string) => void;
 }) {
-  const id = useId();
   return (
-    <label className="flex flex-col gap-1 text-xs text-muted">
+    <div className="flex flex-col gap-1.5 text-xs font-semibold text-muted">
       {label}
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 text-sm font-medium text-text outline-none transition-colors hover:border-white/[0.14] focus:border-accent/60"
-      >
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Select ariaLabel={label} value={value} onChange={onChange} options={options} className="w-full" />
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChampionPicker, ChampionSlot } from "@/components/league";
-import { buttonClass, Segmented } from "@/components/ui";
+import { buttonClass, Segmented, Select } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { championSplashUrl } from "@/lib/ddragon/shared";
 import { ROLES } from "@/lib/league";
@@ -117,10 +117,14 @@ export function StudioEditVideo() {
                 <Line label="Role"><Segmented size="sm" className="no-scrollbar max-w-full overflow-x-auto" value={row.role_id ?? "any"} onChange={(v) => set({ role_id: v === "any" ? null : v })} options={[{ id: "any", label: "Any" }, ...ROLES.map((r) => ({ id: r.id, label: r.label }))]} /></Line>
                 <Line label="Map"><Segmented size="sm" value={row.map_id ?? "sr"} onChange={(v) => set({ map_id: v })} options={[{ id: "sr", label: "Summoner's Rift" }, { id: "aram", label: "ARAM" }, { id: "arena", label: "Arena" }]} /></Line>
                 <Line label="Patch">
-                  <select value={row.patch_id ?? ""} onChange={(e) => set({ patch_id: e.target.value ? Number(e.target.value) : null })} className={cn(inputCls, "h-9 w-auto pr-8")}>
-                    <option value="">Unknown</option>
-                    {patches.map((p) => <option key={p.id} value={p.id}>{p.version}{p.is_current ? " (current)" : ""}</option>)}
-                  </select>
+                  <Select
+                    size="sm"
+                    ariaLabel="Patch"
+                    className="w-40"
+                    value={String(row.patch_id ?? "")}
+                    onChange={(v) => set({ patch_id: v ? Number(v) : null })}
+                    options={[{ id: "", label: "Unknown" }, ...patches.map((p) => ({ id: String(p.id), label: `Patch ${p.version}`, hint: p.is_current ? "current" : undefined }))]}
+                  />
                 </Line>
               </div>
             </div>
