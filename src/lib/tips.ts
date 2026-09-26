@@ -259,6 +259,29 @@ export async function listTags(client: SupabaseClient) {
   return (data ?? []) as TagRow[];
 }
 
+export type ProfileFull = {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string;
+  created_at: string;
+  follower_count: number;
+  following_count: number;
+};
+
+export async function getProfileByUsername(client: SupabaseClient, username: string) {
+  const { data } = await client
+    .from("profiles")
+    .select("id,username,display_name,avatar_url,bio,created_at,follower_count,following_count")
+    .eq("username", username.toLowerCase())
+    .maybeSingle();
+  return (data ?? null) as ProfileFull | null;
+}
+
+export const avatarFor = (p: { username: string; avatar_url?: string | null }) =>
+  p.avatar_url || `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(p.username)}`;
+
 export async function getCurrentPatch(client: SupabaseClient) {
   const { data } = await client.from("patches").select("id,version,ddragon_version").eq("is_current", true).maybeSingle();
   return (data ?? null) as { id: number; version: string; ddragon_version: string } | null;

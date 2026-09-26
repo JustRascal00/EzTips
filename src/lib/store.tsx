@@ -545,7 +545,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...currentUserSeed,
       username: profile?.username ?? currentUserSeed.username,
       displayName: profile?.display_name ?? user?.email?.split("@")[0] ?? currentUserSeed.displayName,
-      avatar: profile?.avatar_url || currentUserSeed.avatar,
+      avatar: profile?.avatar_url || (profile ? `https://api.dicebear.com/9.x/adventurer/svg?seed=${encodeURIComponent(profile.username)}` : currentUserSeed.avatar),
       // Real accounts never show the mock bio / ranks.
       bio: user ? (profile?.bio ?? "") : currentUserSeed.bio,
       ranks: user ? [] : currentUserSeed.ranks,

@@ -1,70 +1,30 @@
-"use client";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { cache } from "react";
+import { createClient } from "@/lib/supabase/server";
+import { avatarFor, getProfileByUsername } from "@/lib/tips";
+import { ProfileView } from "./view";
 
-import { AppShell } from "@/components/layout/AppShell";
-import { GameLogo } from "@/components/GameLogo";
-import { RankBadge } from "@/components/ui";
-import { games } from "@/data/games";
-import { useApp } from "@/lib/store";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { Clapperboard, Settings2 } from "lucide-react";
+const load = cache(async (username: string) => {
+  const supabase = await createClient();
+  if (!supabase) return null;
+  return getProfileByUsername(supabase, decodeURIComponent(username));
+});
 
-export default function UserProfilePage() {
-  const { username } = useParams<{ username: string }>();
-  const { currentUser, selectedGames, followedCreators } = useApp();
-  const user = currentUser;
+export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+  const { username } = await params;
+  const profile = await load(username);
+  if (!profile) return { title: "Player not found" };
+  return {
+    title: `${profile.display_name} (@${profile.username})`,
+    description: profile.bio || `League of Legends tips by @${profile.username} on EZTips.`,
+    openGraph: { images: [{ url: avatarFor(profile) }] },
+  };
+}
 
-  return (
-    <AppShell>
-      <div className="py-8 max-w-4xl">
-        <div className="flex gap-5 items-start">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={user.avatar} alt="" className="h-24 w-24 rounded-full border border-border" />
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold">{user.displayName}</h1>
-            <div className="text-muted">@{username || user.username}</div>
-            <p className="text-sm mt-3 max-w-lg">{user.bio}</p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {user.ranks.map((r) => (
-                <RankBadge key={r.gameId} label={`${games.find((g) => g.id === r.gameId)?.short} · ${r.label}`} type="rank" />
-              ))}
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Link href="/studio" className="inline-flex h-10 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-semibold text-white transition hover:bg-accent-hover">
-                <Clapperboard className="h-4 w-4" />
-                Creator Studio
-              </Link>
-              <Link href="/settings" className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-muted transition hover:bg-hover hover:text-white">
-                <Settings2 className="h-4 w-4" />
-                Edit profile
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-3 gap-3 mt-8">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <div className="text-xs text-muted">Following</div>
-            <div className="text-2xl font-semibold mt-1">{followedCreators.length}</div>
-          </div>
-        </div>
-
-        <section className="mt-10">
-          <h2 className="text-lg font-semibold mb-3">Games played</h2>
-          <div className="flex flex-wrap gap-2">
-            {games
-              .filter((g) => selectedGames.includes(g.id) || user.ranks.some((r) => r.gameId === g.id))
-              .map((g) => (
-                <div key={g.id} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
-                  <GameLogo game={g} size={24} />
-                  <span className="text-sm font-medium">{g.name}</span>
-                </div>
-              ))}
-          </div>
-        </section>
-
-
-      </div>
-    </AppShell>
-  );
+export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+  const { username } = await params;
+  const profile = await load(username);
+  if (!profile) notFound();
+  return <ProfileView profile={profile} />;
 }
