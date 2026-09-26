@@ -105,14 +105,17 @@ export function VoteControl({
   ownerId,
   initial,
   vertical,
+  target = "tip",
 }: {
+  /** id of the tip or build */
   tipId: string;
   ownerId?: string;
   initial: VoteCounts;
   vertical?: boolean;
+  target?: "tip" | "build";
 }) {
-  const { myVotes, vote, currentUser, isLoggedIn } = useApp();
-  const mine = myVotes[tipId] ?? 0;
+  const { myVotes, myBuildVotes, vote, currentUser, isLoggedIn } = useApp();
+  const mine = (target === "tip" ? myVotes : myBuildVotes)[tipId] ?? 0;
   const [counts, setCounts] = useState<VoteCounts>(initial);
   const [busy, setBusy] = useState(false);
   const isOwn = Boolean(ownerId && isLoggedIn && currentUser.id === ownerId);
@@ -126,7 +129,7 @@ export function VoteControl({
     const before = counts;
     setCounts({ upvotes: up, downvotes: down, score: up - down });
     setBusy(true);
-    const result = await vote(tipId, next as 1 | -1 | 0);
+    const result = await vote(tipId, next as 1 | -1 | 0, target);
     setBusy(false);
     if (result) setCounts({ upvotes: result.upvotes, downvotes: result.downvotes, score: result.score });
     else setCounts(before);
@@ -139,7 +142,7 @@ export function VoteControl({
         "inline-flex items-center rounded-full border border-white/10 bg-black/40 backdrop-blur",
         vertical ? "flex-col gap-0.5 px-1 py-1" : "gap-1 px-1 h-10",
       )}
-      title={isOwn ? "You can't vote on your own tip" : undefined}
+      title={isOwn ? `You can't vote on your own ${target}` : undefined}
     >
       <button type="button" aria-label="Upvote" aria-pressed={mine === 1} disabled={isOwn} onClick={() => press(1)} className={cn(btn, "h-8 w-8", mine === 1 ? "bg-accent text-white" : "text-white/75 hover:bg-white/10")}>
         <ArrowBigUp className={cn("h-5 w-5", mine === 1 && "fill-current")} />
@@ -161,27 +164,41 @@ export function StillWorksControl({
   initialPct,
   initialYes,
   initialNo,
+  target = "tip",
+  compact,
 }: {
   tipId: string;
   patch: string | null;
   initialPct: number | null;
   initialYes: number;
   initialNo: number;
+  target?: "tip" | "build";
+  compact?: boolean;
 }) {
-  const { myFlags, flagStillWorks } = useApp();
-  const mine = myFlags[tipId];
+  const { myFlags, myBuildFlags, flagStillWorks } = useApp();
+  const mine = (target === "tip" ? myFlags : myBuildFlags)[tipId];
   const [totals, setTotals] = useState({ pct: initialPct, yes: initialYes, no: initialNo });
   const [busy, setBusy] = useState(false);
 
   async function answer(works: boolean) {
     if (busy) return;
     setBusy(true);
-    const result = await flagStillWorks(tipId, mine === works ? null : works);
+    const result = await flagStillWorks(tipId, mine === works ? null : works, target);
     setBusy(false);
     if (result) setTotals({ pct: result.pct === null ? null : Number(result.pct), yes: result.yes, no: result.no });
   }
 
   const total = totals.yes + totals.no;
+  if (compact) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted">Works on {patch ?? "this patch"}?</span>
+        <button type="button" disabled={busy} onClick={() => answer(true)} aria-pressed={mine === true} className={cn("h-7 rounded-lg border px-2 font-semibold", mine === true ? "border-success/50 bg-success/15 text-success" : "border-white/[0.08] text-muted hover:text-white")}><Check className="mr-0.5 inline h-3.5 w-3.5" />Yes</button>
+        <button type="button" disabled={busy} onClick={() => answer(false)} aria-pressed={mine === false} className={cn("h-7 rounded-lg border px-2 font-semibold", mine === false ? "border-danger/50 bg-danger/15 text-danger" : "border-white/[0.08] text-muted hover:text-white")}><X className="mr-0.5 inline h-3.5 w-3.5" />No</button>
+        {total > 0 && <span className={cn("font-semibold", (totals.pct ?? 0) >= 50 ? "text-success" : "text-amber-300")}>{totals.pct}% of {total} say yes</span>}
+      </div>
+    );
+  }
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

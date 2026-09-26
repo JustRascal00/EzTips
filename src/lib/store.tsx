@@ -23,6 +23,7 @@ import {
   type MyEngagement,
   type StillWorksTotals,
   type VoteTotals,
+  type VoteTarget,
   type VoteValue,
 } from "@/lib/engagement";
 import { currentUserSeed } from "@/data/creators";
@@ -120,9 +121,11 @@ type Store = Persist & {
   myVotes: Record<string, VoteValue>;
   /** Your "still works on this patch" answer per tip id (Supabase). */
   myFlags: Record<string, boolean>;
+  myBuildVotes: Record<string, VoteValue>;
+  myBuildFlags: Record<string, boolean>;
   /** 1 = up, -1 = down, 0 = remove. Resolves with fresh totals, or null if it failed / not signed in. */
-  vote: (id: string, value: VoteValue | 0) => Promise<VoteTotals | null>;
-  flagStillWorks: (id: string, works: boolean | null) => Promise<StillWorksTotals | null>;
+  vote: (id: string, value: VoteValue | 0, target?: VoteTarget) => Promise<VoteTotals | null>;
+  flagStillWorks: (id: string, works: boolean | null, target?: VoteTarget) => Promise<StillWorksTotals | null>;
   toggleSave: (id: string) => void;
   saveToCollection: (tutorialId: string, collectionId: string) => void;
   createCollection: (name: string, tutorialId?: string) => void;
@@ -217,44 +220,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { supabase, userId: user.id };
   }, [toast, user]);
 
-  const vote = useCallback(async (id: string, value: VoteValue | 0) => {
+  const vote = useCallback(async (id: string, value: VoteValue | 0, target: VoteTarget = "tip") => {
     const ctx = signedInClient("vote");
     if (!ctx) return null;
-    const previous = remoteRef.current.votes[id];
+    const key = target === "tip" ? "votes" : "buildVotes";
+    const previous = remoteRef.current[key][id];
     setRemote((r) => {
-      const votes = { ...r.votes };
+      const votes = { ...r[key] };
       if (value === 0) delete votes[id]; else votes[id] = value;
-      return { ...r, votes };
+      return { ...r, [key]: votes };
     });
     try {
-      return await castVote(ctx.supabase, id, value);
+      return await castVote(ctx.supabase, id, value, target);
     } catch (error) {
       setRemote((r) => {
-        const votes = { ...r.votes };
+        const votes = { ...r[key] };
         if (previous) votes[id] = previous; else delete votes[id];
-        return { ...r, votes };
+        return { ...r, [key]: votes };
       });
       toast(error instanceof Error ? error.message : "Couldn't vote");
       return null;
     }
   }, [signedInClient, toast]);
 
-  const flagStillWorks = useCallback(async (id: string, works: boolean | null) => {
+  const flagStillWorks = useCallback(async (id: string, works: boolean | null, target: VoteTarget = "tip") => {
     const ctx = signedInClient("answer");
     if (!ctx) return null;
-    const previous = remoteRef.current.flags[id];
+    const key = target === "tip" ? "flags" : "buildFlags";
+    const previous = remoteRef.current[key][id];
     setRemote((r) => {
-      const flags = { ...r.flags };
+      const flags = { ...r[key] };
       if (works === null) delete flags[id]; else flags[id] = works;
-      return { ...r, flags };
+      return { ...r, [key]: flags };
     });
     try {
-      return await setStillWorks(ctx.supabase, id, works);
+      return await setStillWorks(ctx.supabase, id, works, target);
     } catch (error) {
       setRemote((r) => {
-        const flags = { ...r.flags };
+        const flags = { ...r[key] };
         if (previous === undefined) delete flags[id]; else flags[id] = previous;
-        return { ...r, flags };
+        return { ...r, [key]: flags };
       });
       toast(error instanceof Error ? error.message : "Couldn't save your answer");
       return null;
@@ -562,6 +567,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       followedCreators: configured ? remote.following : state.followedCreators,
       myVotes: remote.votes,
       myFlags: remote.flags,
+      myBuildVotes: remote.buildVotes,
+      myBuildFlags: remote.buildFlags,
       vote,
       flagStillWorks,
       selectedGames: backendGames ?? state.selectedGames,

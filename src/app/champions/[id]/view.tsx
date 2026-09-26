@@ -1,5 +1,6 @@
 "use client";
 
+import { BuildsTab } from "@/components/builds";
 import { CoachChat } from "@/components/coach/CoachChat";
 import { AppShell } from "@/components/layout/AppShell";
 import { ChampionIcon, ChampionPicker, TipGrid } from "@/components/league";
@@ -9,15 +10,20 @@ import { ROLES } from "@/lib/league";
 import { listTips, searchTips } from "@/lib/tips";
 import type { Tutorial } from "@/lib/types";
 import { useCurrentPatch, useSupabaseQuery } from "@/lib/use-tips";
-import { Hammer, Sparkles, Swords, Upload, X } from "lucide-react";
+import { Sparkles, Swords, Upload, X } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Champion = { id: string; name: string; title: string; tags: string[] };
 
 export function ChampionView({ champion }: { champion: Champion }) {
   const { patch } = useCurrentPatch();
   const [tab, setTab] = useState("tips");
+  // allow deep links like /champions/Ahri#builds
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (["tips", "builds", "matchups", "coach"].includes(hash)) queueMicrotask(() => setTab(hash));
+  }, []);
   const [sort, setSort] = useState<"top" | "new">("top");
   const [role, setRole] = useState("all");
   const [opponent, setOpponent] = useState<{ id: string; name: string } | null>(null);
@@ -90,13 +96,7 @@ export function ChampionView({ champion }: { champion: Champion }) {
           </>
         )}
 
-        {tab === "builds" && (
-          <EmptyState
-            title={`No ${champion.name} builds yet`}
-            body="Recommended and community builds (items, runes, spells, skill order) for the current patch will show here."
-            action={<button type="button" onClick={() => setTab("coach")} className={buttonClass("secondary", "md")}><Hammer className="h-4 w-4" />Ask the coach for a build</button>}
-          />
-        )}
+        {tab === "builds" && <BuildsTab championId={champion.id} championName={champion.name} onAskCoach={() => setTab("coach")} />}
 
         {tab === "matchups" && (
           <div>

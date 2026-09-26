@@ -67,12 +67,27 @@ export async function getChampions(version: string) {
   return Object.values(json.data).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Summoner's Rift (map 11) purchasable items only, unless includeAll is set. */
-export async function getItems(version: string, { includeAll = false } = {}) {
+/** Purchasable items on a map (11 = Summoner's Rift, 12 = ARAM, 30 = Arena), unless includeAll is set. */
+export async function getItems(version: string, { includeAll = false, mapId = 11 } = {}) {
   const json = await getJson<{ data: Record<string, DDragonItem> }>(dataUrl(version, "item.json"));
   return Object.entries(json.data)
     .map(([id, item]) => ({ id, ...item }))
-    .filter((item) => includeAll || (item.gold.purchasable && item.maps["11"] && item.inStore !== false && !item.requiredChampion));
+    .filter((item) => includeAll || (item.gold.purchasable && item.maps[String(mapId)] && item.inStore !== false && !item.requiredChampion));
+}
+
+export type DDragonChampionSpell = { id: string; name: string; description: string; image: DDragonImage };
+
+/** Q/W/E/R + passive for one champion (for skill order). */
+export async function getChampionSpells(version: string, championId: string) {
+  const json = await getJson<{ data: Record<string, { spells: DDragonChampionSpell[]; passive: { name: string; image: DDragonImage } }> }>(
+    `${DDRAGON_BASE}/cdn/${version}/data/${LOCALE}/champion/${encodeURIComponent(championId)}.json`,
+  );
+  const champ = Object.values(json.data)[0];
+  if (!champ) return null;
+  return {
+    passive: { name: champ.passive.name, image: champ.passive.image.full },
+    spells: champ.spells.map((s, i) => ({ key: "QWER"[i], name: s.name, image: s.image.full })),
+  };
 }
 
 export async function getRuneTrees(version: string) {
